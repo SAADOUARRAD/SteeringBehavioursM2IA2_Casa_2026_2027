@@ -1,35 +1,38 @@
+// Entité Target autonome étendant Vehicle (cible mobile et circulaire)
 class Target extends Vehicle {
   constructor(x, y) {
     super(x, y);
-    this.r = 50; // rayon de la cible
+    this.r = 25; // rayon du cercle de la cible
     this.color = 'red';
-    this.vel = p5.Vector.random2D(); // vitesse initiale aléatoire
-    // Vitesse max aléatoire enter 1 et 6
-    this.vel.setMag(random(1, 6));
-
-    setInterval(() => {
-      // Changer la direction de la vitesse aléatoirement toutes les 500 ms
-      this.vel = p5.Vector.random2D();
-      this.vel.setMag(random(1, 6));
-      // change le rayon aussi
-        this.r = random(20, 50);
-        // et de couleur
-        this.color = color(random(255), random(255), random(255));
-        // et l'accélération
-        this.acc = p5.Vector.random2D();
-        this.acc.setMag(random(0.1, 0.5));
-    }, 1000);
+    this.maxSpeed = 3;
+    if (typeof p5 !== 'undefined' && p5.Vector && typeof p5.Vector.random2D === 'function') {
+      this.vel = p5.Vector.random2D().mult(this.maxSpeed);
+    } else if (typeof createVector === 'function') {
+      this.vel = createVector(1, 0).mult(this.maxSpeed);
+    }
   }
 
   update() {
-    this.vel.setHeading(this.vel.heading() + random(-0.2, 0.2)); // changement aléatoire de direction
+    // Petite variation continue de direction
+    if (typeof random === 'function') {
+      this.vel.rotate(random(-0.1, 0.1));
+    }
     super.update();
+    this.edges();
+  }
 
+  respawnRandom(w = width, h = height) {
+    const rx = typeof random === 'function' ? random(this.r, Math.max(this.r, w - this.r)) : w / 2;
+    const ry = typeof random === 'function' ? random(this.r, Math.max(this.r, h - this.r)) : h / 2;
+    this.pos.set(rx, ry);
   }
 
   show() {
+    push();
     fill(this.color);
-    noStroke();
+    stroke('white');
+    strokeWeight(2);
     circle(this.pos.x, this.pos.y, this.r * 2);
+    pop();
   }
 }

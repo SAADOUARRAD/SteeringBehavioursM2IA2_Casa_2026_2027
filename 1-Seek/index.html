@@ -3,21 +3,62 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seek — population de véhicules</title>
+    <title>Seek & Flee — Exercices Steering Behaviors</title>
     <link rel="stylesheet" href="style.css">
     <script src="libraries/p5.min.js"></script>
     <script src="vehicle.js"></script>
-    <script src="population.js"></script>
+    <script src="FollowerVehicle.js"></script>
+    <script src="target.js"></script>
     <script src="mouseTarget.js"></script>
+    <script src="soundEffects.js"></script>
+    <script src="population.js"></script>
     <script src="sketch.js"></script>
   </head>
   <body>
     <header id="controls">
-      <label for="vehicle-count">Véhicules :</label>
-      <input id="vehicle-count" type="range" min="1" max="200" step="1" value="20">
-      <output id="vehicle-count-value" for="vehicle-count">20 / 200</output>
-      <span class="hint">Déplacez la souris dans la scène pour guider la cible rouge.</span>
+      <div class="control-group">
+        <label for="vehicle-count">Véhicules :</label>
+        <input id="vehicle-count" type="range" min="1" max="200" step="1" value="20">
+        <output id="vehicle-count-value">20 / 200</output>
+      </div>
+
+      <div class="control-group">
+        <label for="vitesse-max">Vitesse Max :</label>
+        <input id="vitesse-max" type="range" min="1" max="20" step="1" value="4">
+        <output id="vitesse-max-value">4</output>
+      </div>
+
+      <div class="control-group">
+        <label for="force-max">Force Max :</label>
+        <input id="force-max" type="range" min="0.01" max="1" step="0.01" value="0.1">
+        <output id="force-max-value">0.1</output>
+      </div>
+
+      <div class="control-group">
+        <button id="toggle-mode" type="button">Mode : Seek</button>
+        <button id="toggle-target" type="button">Cible : Souris</button>
+        <button id="toggle-variant" type="button">Arrivée : Véhicule réapparaît</button>
+        <button id="toggle-sound" type="button" title="Activer ou couper le son">🔊 Son : ON</button>
+      </div>
+
+      <div class="control-group">
+        <label for="bg-select">Fond :</label>
+        <select id="bg-select">
+          <option value="#000000">Noir</option>
+          <option value="#0b132b">Bleu nuit</option>
+          <option value="#1c2541">Bleu profond</option>
+          <option value="#1a1a24">Gris sombre</option>
+          <option value="#0d1b1e">Vert sombre</option>
+          <option value="#240046">Violet cosmique</option>
+          <option value="stars">✨ Étoilé</option>
+          <option value="grid">🌐 Grille Cyber</option>
+          <option value="custom">🎨 Personnalisé</option>
+        </select>
+        <input id="bg-color-picker" type="color" value="#000000" title="Choisir une couleur personnalisée">
+      </div>
+
+      <span class="hint">Survolez le canvas ou activez la cible mobile.</span>
     </header>
-    <main id="scene" aria-label="Simulation de véhicules poursuivant une cible"></main>
+    <main id="scene" aria-label="Simulation de véhicules suiveurs"></main>
   </body>
 </html>

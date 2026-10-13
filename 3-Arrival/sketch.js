@@ -304,8 +304,8 @@ function buildUI() {
   ${slider('s2-spd',  'Vitesse max',   P.speed2, 0.5, 12,  0.5)}
   ${slider('s2-frc',  'Force max',     P.force2, 0.05, 2, 0.05)}
 
-  <div class="sec">🍎 Nourriture</div>
-  ${slider('num-food','Nb. proies',    P.numFood, 2, 30, 1)}
+  <div class="sec">🍔🍕 Burgers & Pizzas</div>
+  ${slider('num-food','Nb. plats',     P.numFood, 2, 30, 1)}
   ${slider('seg-gap', 'Écart segments',P.segGap, 5, 28, 1)}
   ${slider('ptcl-cnt','Particules/repas',P.particlesOnEat, 0, 40, 1)}
 
@@ -327,7 +327,7 @@ function buildUI() {
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
     <button id="btn-reset"  class="act">↺ Reset</button>
     <button id="btn-debug"  class="act">🐛 Debug</button>
-    <button id="btn-spawn"  class="act">+ Nourriture</button>
+    <button id="btn-spawn"  class="act">+ Burger/Pizza</button>
   </div>
 
   <style>

@@ -44,7 +44,9 @@ global.frameCount   = 0;
 ['push','pop','noStroke','stroke','fill','strokeWeight','circle','ellipse',
  'rect','line','noFill','arc','beginShape','endShape','curveVertex',
  'translate','rotate','triangle','colorMode','background','text',
- 'textSize','textFont'].forEach(fn => global[fn] = ()=>{});
+ 'textSize','textFont','rectMode'].forEach(fn => global[fn] = ()=>{});
+global.CORNER       = 'corner';
+global.CENTER       = 'center';
 global.drawingContext = { setLineDash: ()=>{} };
 global.angleMode    = ()=>{};
 global.RADIANS      = 0;
@@ -128,6 +130,21 @@ describe('Food', () => {
     f.update();
     assert.equal(f.pos.x, 150);
     assert.equal(f.pos.y, 250);
+  });
+
+  it('type est soit burger soit pizza', () => {
+    const f = new Food(100, 200);
+    assert.ok(['burger', 'pizza'].includes(f.type));
+  });
+
+  it('show() s\'exécute sans erreur pour burger et pizza', () => {
+    const fb = new Food(100, 200);
+    fb.type = 'burger';
+    assert.doesNotThrow(() => fb.show());
+
+    const fp = new Food(100, 200);
+    fp.type = 'pizza';
+    assert.doesNotThrow(() => fp.show());
   });
 });
 

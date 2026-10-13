@@ -1,6 +1,71 @@
 html, body {
   margin: 0;
   padding: 0;
+  background: #0c0e14;
+  color: #f5f5f5;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  padding: 10px 16px;
+  background: #181b24;
+  border-bottom: 1px solid #2d3240;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#controls label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+#controls input[type="range"] {
+  width: 95px;
+  accent-color: #00f0ff;
+  cursor: pointer;
+}
+
+#controls output {
+  min-width: 44px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: #00f0ff;
+}
+
+#controls button {
+  background: #232834;
+  color: #f5f5f5;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#controls button:hover {
+  background: #333a4c;
+  border-color: #00f0ff;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-left: auto;
+}
+
+#canvas-container {
+  display: block;
+  width: 100vw;
 }
 
 canvas {

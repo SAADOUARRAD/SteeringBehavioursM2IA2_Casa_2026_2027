@@ -22,7 +22,7 @@ let arrivalVariant = 'vehicle'; // 'vehicle' (le véhicule réapparaît) ou 'tar
 
 // Gestion du fond
 let currentBgColor = '#000000';
-let bgMode = 'color'; // 'color', 'stars', 'grid'
+let bgMode = 'rainbow_wave'; // 'rainbow_wave', 'color', 'stars', 'grid'
 let stars = [];
 
 function sceneHeight() {
@@ -150,7 +150,9 @@ function setup() {
   if (bgSelect) {
     bgSelect.addEventListener('change', () => {
       const val = bgSelect.value;
-      if (val === 'stars') {
+      if (val === 'rainbow_wave') {
+        bgMode = 'rainbow_wave';
+      } else if (val === 'stars') {
         bgMode = 'stars';
       } else if (val === 'grid') {
         bgMode = 'grid';
@@ -209,8 +211,69 @@ function ajusterNombreVehicules(targetCount) {
   }
 }
 
+const rainbowPalette = [
+  [0, 245, 255],   // Cyan néon électrique (centre)
+  [65, 80, 245],   // Bleu indigo
+  [165, 75, 245],  // Violet vif
+  [255, 95, 210],  // Magenta / Rose
+  [255, 100, 80],  // Corail / Rouge-orangé
+  [115, 250, 90]   // Vert lime éclatant
+];
+
+function getPaletteColor(phase, brightness = 1) {
+  const normPhase = ((phase % 1) + 1) % 1;
+  const len = rainbowPalette.length;
+  const pos = normPhase * len;
+  const idx0 = Math.floor(pos) % len;
+  const idx1 = (idx0 + 1) % len;
+  const frac = pos - Math.floor(pos);
+
+  const c0 = rainbowPalette[idx0];
+  const c1 = rainbowPalette[idx1];
+
+  const r = Math.min(255, Math.max(0, Math.round((c0[0] * (1 - frac) + c1[0] * frac) * brightness)));
+  const g = Math.min(255, Math.max(0, Math.round((c0[1] * (1 - frac) + c1[1] * frac) * brightness)));
+  const b = Math.min(255, Math.max(0, Math.round((c0[2] * (1 - frac) + c1[2] * frac) * brightness)));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawRainbowWaves() {
+  if (typeof drawingContext === 'undefined' || !drawingContext.createRadialGradient) {
+    background('#00f0ff');
+    return;
+  }
+
+  // 1. Centre flottant en mouvement (en mouvement fluide)
+  const cx = width * 0.38 + Math.sin(frameCount * 0.015) * 50;
+  const cy = height * 0.52 + Math.cos(frameCount * 0.012) * 35;
+
+  // Rayon maximal pour couvrir tout l'écran
+  const maxR = Math.hypot(Math.max(cx, width - cx), Math.max(cy, height - cy)) * 1.05;
+
+  const grad = drawingContext.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+
+  // 2. Effet clignotant / pulsation d'éclat lumineux (enclignotant)
+  const blink = 0.88 + 0.20 * Math.sin(frameCount * 0.12) + 0.12 * Math.sin(frameCount * 0.25);
+
+  // 3. Propagation des ondes vers l'extérieur (en mouvement)
+  const waveOffset = (frameCount * 0.0075);
+  const cycles = 2.6 + 0.2 * Math.sin(frameCount * 0.03); // Légère respiration des anneaux
+
+  const steps = 45;
+  for (let i = 0; i <= steps; i++) {
+    const p = i / steps;
+    const phase = (p * cycles - waveOffset);
+    grad.addColorStop(p, getPaletteColor(phase, blink));
+  }
+
+  drawingContext.fillStyle = grad;
+  drawingContext.fillRect(0, 0, width, height);
+}
+
 function drawBackground() {
-  if (bgMode === 'stars') {
+  if (bgMode === 'rainbow_wave') {
+    drawRainbowWaves();
+  } else if (bgMode === 'stars') {
     background('#080d1a');
     push();
     noStroke();

@@ -9,6 +9,7 @@
     <script src="vehicle.js"></script>
     <script src="FollowerVehicle.js"></script>
     <script src="target.js"></script>
+    <script src="targetFuyante.js"></script>
     <script src="mouseTarget.js"></script>
     <script src="soundEffects.js"></script>
     <script src="population.js"></script>
@@ -16,6 +17,26 @@
   </head>
   <body>
     <header id="controls">
+      <div class="control-group">
+        <label for="scenario-select">Scénario :</label>
+        <select id="scenario-select">
+          <option value="1" selected>Scénario 1 : Suiveurs & Réapparition</option>
+          <option value="2">Scénario 2 : Cible Fuyante (Flee)</option>
+        </select>
+      </div>
+
+      <div class="control-group group-scenario-2" id="group-detection-radius" style="display: none;">
+        <label for="detection-radius">Rayon Détection :</label>
+        <input id="detection-radius" type="range" min="50" max="400" step="10" value="200">
+        <output id="detection-radius-value">200 px</output>
+      </div>
+
+      <div class="control-group group-scenario-2" id="group-flee-duration" style="display: none;">
+        <label for="flee-duration">Durée Fuite Max :</label>
+        <input id="flee-duration" type="range" min="0.5" max="6.0" step="0.1" value="2.5">
+        <output id="flee-duration-value">2.5 s</output>
+      </div>
+
       <div class="control-group">
         <label for="vehicle-count">Véhicules :</label>
         <input id="vehicle-count" type="range" min="1" max="200" step="1" value="20">
@@ -39,6 +60,7 @@
         <button id="toggle-target" type="button">Cible : Souris</button>
         <button id="toggle-variant" type="button">Arrivée : Véhicule réapparaît</button>
         <button id="toggle-sound" type="button" title="Activer ou couper le son">🔊 Son : ON</button>
+        <button id="toggle-debug" type="button" title="Activer / désactiver le mode debug (touche 'd')">🛠️ Debug [D] : OFF</button>
       </div>
 
       <div class="control-group">

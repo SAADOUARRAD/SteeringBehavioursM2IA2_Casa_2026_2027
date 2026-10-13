@@ -23,8 +23,10 @@ S'appuyer sur l'article de Craig W. Reynolds, « Steering Behaviors for Autonomo
 
 ## Entités et organisation des fichiers
 
-- Garder un fichier distinct par entité identifiée dans l'exemple : par exemple `Player.js`, `Enemy.js`, `Target.js` ou `Obstacle.js`. Ne pas regrouper plusieurs classes d'entités dans un même fichier.
-- Toute entité visible doit étendre `Vehicle`, y compris une entité qui paraît statique. Ne créer aucune classe d'objet visible indépendante de `Vehicle`.
+- Garder un fichier distinct par entité identifiée dans l'exemple : par exemple `Player.js`, `Enemy.js`, `Target.js`, `TargetFuyante.js` ou `Obstacle.js`. Ne pas regrouper plusieurs classes d'entités dans un même fichier.
+- **Règle absolue pour tous les travaux futurs :** Tous les objets graphiques affichés dans la scène sont obligatoirement des sous-classes ou instances de `Vehicle` et utilisent exclusivement les comportements de steering (`applyForce` + locomotion `update`) pour se déplacer. Aucun objet visible ne doit être créé indépendamment de `Vehicle`, ni se déplacer par téléportation manuelle ou modification directe de `pos` dans les comportements.
+- **Scénarios interactifs et paramètres :** Lorsque plusieurs scénarios sont proposés (ex. scénario 1 de poursuite classique vs scénario 2 de cible fuyante avec prédation), ils doivent être sélectionnables via un menu déroulant dans la UI. Les paramètres dynamiques (rayons de détection, durées maximales de fuite / endurance) doivent être ajustables par curseurs (sliders) avec affichage temps réel.
+- **Mode Debug unifié (Touche 'd') :** Le mode debug doit pouvoir être activé et désactivé avec la touche `'d'` du clavier (et un bouton UI). Il permet de rendre visibles les cercles de détection (jaune par défaut, rouge lorsqu'un prédateur/véhicule y pénètre), les distances de sécurité, ainsi que les jauges ou vecteurs d'état.
 - Garder chaque exemple autonome dans son dossier existant. Placer les nouvelles classes d'entité et les comportements dans des fichiers séparés et nommés clairement; éviter les grandes fonctions qui mélangent perception, décision, calcul des forces, mise à jour et dessin.
 - Les noms de fichiers déjà en minuscules dans un exemple peuvent conserver cette convention; ne pas renommer les fichiers existants sans nécessité.
 

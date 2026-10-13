@@ -14,7 +14,9 @@ Pour étendre un exemple, créer une sous-classe distincte de `Vehicle` pour cha
 
 ### Classes d'entité
 
-Créer un fichier séparé par type d'entité, dans le dossier de l'exemple concerné : par exemple `Player.js`, `Enemy.js` et `Target.js`. Ne pas regrouper plusieurs types d'entités dans un fichier. Toute entité visible, même si elle paraît statique, étend `Vehicle`; ne pas créer de classe d'objet visible indépendante de `Vehicle`.
+Créer un fichier séparé par type d'entité, dans le dossier de l'exemple concerné : par exemple `Player.js`, `Enemy.js`, `Target.js` et `TargetFuyante.js`. Ne pas regrouper plusieurs types d'entités dans un fichier. 
+
+**Règle fondamentale :** Toute entité visible, même si elle paraît statique ou sert de cible, étend obligatoirement `Vehicle`. Ne créer aucune classe d'objet visible indépendante de `Vehicle`. Tous les objets graphiques se déplacent exclusivement en appliquant des forces via `applyForce()` et en mettant à jour leur cinématique par la locomotion `update()`. Aucune téléportation manuelle ou assignation directe de coordonnées ne doit remplacer le steering.
 
 ### Comportements et composition
 

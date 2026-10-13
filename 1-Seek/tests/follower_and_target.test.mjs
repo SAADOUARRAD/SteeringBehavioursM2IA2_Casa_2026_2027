@@ -77,6 +77,9 @@ function loadEnv(w = 800, h = 600, withAudio = false) {
     stroke: () => {},
     strokeWeight: () => {},
     circle: () => {},
+    rect: () => {},
+    noFill: () => {},
+    noStroke: () => {},
     translate: () => {},
     rotate: () => {},
     triangle: () => {},
@@ -85,11 +88,11 @@ function loadEnv(w = 800, h = 600, withAudio = false) {
     performance: { now: () => Date.now() },
   });
 
-  for (const file of ['vehicle.js', 'FollowerVehicle.js', 'target.js', 'soundEffects.js']) {
+  for (const file of ['vehicle.js', 'FollowerVehicle.js', 'target.js', 'targetFuyante.js', 'soundEffects.js']) {
     vm.runInContext(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), context);
   }
 
-  return vm.runInContext('({ Vehicle, FollowerVehicle, Target, SoundEffects })', context);
+  return vm.runInContext('({ Vehicle, FollowerVehicle, Target, TargetFuyante, SoundEffects })', context);
 }
 
 test('FollowerVehicle hérite de Vehicle et initialise mode seek', () => {
@@ -168,4 +171,84 @@ test('SoundEffects gère l activation, le throttle et la synthèse audio', () =>
   // Throttling immédiat (< 40ms)
   const throttled = s.playImpact(500, 0.08);
   assert.equal(throttled, false, 'Doit être ignoré pour éviter la saturation sonore');
+});
+
+test('TargetFuyante hérite de Vehicle et de Target', () => {
+  const { Vehicle, Target, TargetFuyante } = loadEnv();
+  const tf = new TargetFuyante(200, 200);
+  assert.ok(tf instanceof Vehicle, 'TargetFuyante doit être une sous-classe de Vehicle');
+  assert.ok(tf instanceof Target, 'TargetFuyante doit étendre Target');
+  assert.equal(tf.detectionRadius, 200);
+  assert.equal(tf.safeDistance, 300);
+  assert.equal(tf.maxFleeDuration, 2.5);
+  assert.equal(tf.isFleeing, false);
+});
+
+test('TargetFuyante ne fuit pas si le prédateur est hors de portée (> 200px)', () => {
+  const { TargetFuyante } = loadEnv();
+  const tf = new TargetFuyante(200, 200);
+  const distantVehicle = { pos: new Vector(500, 200) }; // dist = 300px > 200px
+
+  tf.applyBehaviors([distantVehicle], 1 / 60);
+  assert.equal(tf.isFleeing, false, 'Ne doit pas fuir à 300px');
+  assert.equal(tf.maxSpeed, 3, 'Doit conserver sa vitesse de croisière');
+});
+
+test('TargetFuyante fuit, accélère et fuit jusqu à 300px puis reprend son calme', () => {
+  const { TargetFuyante } = loadEnv();
+  const tf = new TargetFuyante(200, 200);
+  const predator = { pos: new Vector(350, 200) }; // dist = 150px <= 200px
+
+  // 1. Déclenchement de la fuite
+  tf.applyBehaviors([predator], 1 / 60);
+  assert.equal(tf.isFleeing, true, 'Doit fuir si prédateur dans le cercle de 200px');
+  assert.equal(tf.maxSpeed, 6, 'Doit accélérer et augmenter sa vitesse pendant la fuite');
+  assert.ok(tf.acc.x < 0, 'La force de fuite doit pousser à l opposé du prédateur');
+
+  // 2. Maintien de la fuite tant que dist < 300px (ex: 260px)
+  predator.pos.set(460, 200); // dist = 260px
+  tf.applyBehaviors([predator], 1 / 60);
+  assert.equal(tf.isFleeing, true, 'Doit continuer de fuir jusqu à 300px');
+
+  // 3. Fin de la fuite une fois à 300px ou plus
+  predator.pos.set(510, 200); // dist = 310px >= 300px
+  tf.applyBehaviors([predator], 1 / 60);
+  assert.equal(tf.isFleeing, false, 'Doit cesser de fuir une fois à distance de sécurité');
+  assert.equal(tf.maxSpeed, 3, 'Doit reprendre son comportement normal de Target');
+});
+
+test('TargetFuyante ne peut pas fuir plus de 2,5s (endurance limitée) et récupère au repos', () => {
+  const { TargetFuyante } = loadEnv();
+  const tf = new TargetFuyante(200, 200);
+  const predator = { pos: new Vector(300, 200) }; // dist = 100px
+
+  // Début fuite (0.1s écoulée, endurance = 2.4s)
+  tf.applyBehaviors([predator], 0.1);
+  assert.equal(tf.isFleeing, true);
+  assert.ok(tf.currentEndurance < 2.5);
+
+  // Écoulement de 2,3 secondes supplémentaires (total 2.4s écoulées)
+  for (let i = 0; i < 23; i++) {
+    tf.applyBehaviors([predator], 0.1);
+  }
+  assert.equal(tf.isFleeing, true);
+
+  // Franchissement de la limite des 2,5s (endurance tombe à 0)
+  tf.applyBehaviors([predator], 0.1);
+  assert.equal(tf.currentEndurance, 0);
+  assert.equal(tf.isExhausted, true);
+  assert.equal(tf.isFleeing, false, 'Doit s arrêter de fuir une fois l endurance épuisée');
+
+  // Repos : prédateur éloigné, l endurance remonte
+  predator.pos.set(700, 200);
+  tf.applyBehaviors([predator], 1.0); // 1 seconde de repos
+  assert.ok(tf.currentEndurance >= 1.0, 'L endurance doit se recharger au repos');
+});
+
+test('TargetFuyante show supporte mode normal et debug', () => {
+  const { TargetFuyante } = loadEnv();
+  const tf = new TargetFuyante(200, 200);
+  // Doit s exécuter sans erreur en debug false et true
+  assert.doesNotThrow(() => tf.show(false));
+  assert.doesNotThrow(() => tf.show(true));
 });

@@ -16,9 +16,16 @@ let toggleSoundBtn;
 let bgSelect, bgColorPicker;
 
 // États de la simulation
+let currentScenario = '1'; // '1': Scénario classique, '2': Cible fuyante
 let currentMode = 'seek'; // 'seek' ou 'flee'
 let targetType = 'mouse'; // 'mouse' ou 'autonomous'
 let arrivalVariant = 'vehicle'; // 'vehicle' (le véhicule réapparaît) ou 'target' (la cible réapparaît)
+
+let fleeingTarget;
+let scenarioSelect, groupDetectionRadius, detectionRadiusSlider, detectionRadiusValue;
+let groupFleeDuration, fleeDurationSlider, fleeDurationValue;
+let toggleDebugBtn;
+let debugMode = false; // Mode debug activable avec la touche 'd'
 
 // Gestion du fond
 let currentBgColor = '#000000';
@@ -66,12 +73,23 @@ function setup() {
 
   initStars();
 
-  // Initialisation des cibles (souris et autonome étendant Vehicle)
+  // Initialisation des cibles (souris, autonome et fuyante étendant Vehicle)
   mouseTarget = new MouseTarget(width / 2, height / 2);
   autonomousTarget = new Target(width / 2, height / 2);
+  fleeingTarget = new TargetFuyante(width / 2, height / 2);
   target = mouseTarget;
 
   // Récupération des éléments DOM
+  scenarioSelect = document.getElementById('scenario-select');
+  groupDetectionRadius = document.getElementById('group-detection-radius');
+  detectionRadiusSlider = document.getElementById('detection-radius');
+  detectionRadiusValue = document.getElementById('detection-radius-value');
+
+  groupFleeDuration = document.getElementById('group-flee-duration');
+  fleeDurationSlider = document.getElementById('flee-duration');
+  fleeDurationValue = document.getElementById('flee-duration-value');
+  toggleDebugBtn = document.getElementById('toggle-debug');
+
   vehicleCountSlider = document.getElementById('vehicle-count');
   vehicleCountValue = document.getElementById('vehicle-count-value');
   vitesseMaxSlider = document.getElementById('vitesse-max');
@@ -84,6 +102,62 @@ function setup() {
   toggleSoundBtn = document.getElementById('toggle-sound');
   bgSelect = document.getElementById('bg-select');
   bgColorPicker = document.getElementById('bg-color-picker');
+
+  // Gestion du mode debug (activable par bouton ou touche 'd')
+  function toggleDebug() {
+    debugMode = !debugMode;
+    if (toggleDebugBtn) {
+      toggleDebugBtn.textContent = debugMode ? '🛠️ Debug [D] : ON' : '🛠️ Debug [D] : OFF';
+      toggleDebugBtn.style.borderColor = debugMode ? '#00ff66' : '#4a5568';
+    }
+  }
+
+  if (toggleDebugBtn) {
+    toggleDebugBtn.addEventListener('click', toggleDebug);
+  }
+
+  window.addEventListener('keydown', event => {
+    if (event.key === 'd' || event.key === 'D') {
+      toggleDebug();
+    }
+  });
+
+  // Gestion du sélecteur de scénario
+  if (scenarioSelect) {
+    scenarioSelect.addEventListener('change', () => {
+      currentScenario = scenarioSelect.value;
+      if (currentScenario === '2') {
+        if (groupDetectionRadius) groupDetectionRadius.style.display = 'flex';
+        if (groupFleeDuration) groupFleeDuration.style.display = 'flex';
+        target = fleeingTarget;
+      } else {
+        if (groupDetectionRadius) groupDetectionRadius.style.display = 'none';
+        if (groupFleeDuration) groupFleeDuration.style.display = 'none';
+        target = (targetType === 'mouse') ? mouseTarget : autonomousTarget;
+      }
+    });
+  }
+
+  // Slider du rayon de détection de la cible fuyante (Scénario 2)
+  if (detectionRadiusSlider) {
+    detectionRadiusSlider.addEventListener('input', () => {
+      const val = Number(detectionRadiusSlider.value);
+      if (detectionRadiusValue) detectionRadiusValue.textContent = `${val} px`;
+      if (fleeingTarget) fleeingTarget.detectionRadius = val;
+    });
+  }
+
+  // Slider de durée maximale de fuite / endurance (Scénario 2)
+  if (fleeDurationSlider) {
+    fleeDurationSlider.addEventListener('input', () => {
+      const val = Number(fleeDurationSlider.value);
+      if (fleeDurationValue) fleeDurationValue.textContent = `${val} s`;
+      if (fleeingTarget) {
+        fleeingTarget.maxFleeDuration = val;
+        fleeingTarget.currentEndurance = Math.min(fleeingTarget.currentEndurance, val);
+      }
+    });
+  }
 
   // Création initiale de la population de véhicules
   const initialCount = vehicleCountSlider ? Number(vehicleCountSlider.value) : 20;
@@ -186,7 +260,7 @@ function setup() {
 
   // Suivi de la souris dans le canvas
   sceneCanvas.elt.addEventListener('pointermove', event => {
-    if (targetType !== 'mouse') return;
+    if (currentScenario !== '1' || targetType !== 'mouse') return;
     const rect = sceneCanvas.elt.getBoundingClientRect();
     const x = (event.clientX - rect.left) * width / rect.width;
     const y = (event.clientY - rect.top) * height / rect.height;
@@ -303,12 +377,27 @@ function drawBackground() {
 function draw() {
   drawBackground();
 
-  // Mise à jour de la cible active
-  if (targetType === 'autonomous') {
-    autonomousTarget.update();
-    target = autonomousTarget;
+  // Mise à jour de la cible active selon le scénario
+  if (currentScenario === '2') {
+    if (detectionRadiusSlider) {
+      fleeingTarget.detectionRadius = Number(detectionRadiusSlider.value);
+    }
+    if (fleeDurationSlider) {
+      fleeingTarget.maxFleeDuration = Number(fleeDurationSlider.value);
+    }
+    const dt = (typeof deltaTime !== 'undefined' && deltaTime > 0)
+      ? Math.min(0.1, deltaTime / 1000)
+      : (1 / 60);
+
+    fleeingTarget.update(vehicles, dt);
+    target = fleeingTarget;
   } else {
-    target = mouseTarget;
+    if (targetType === 'autonomous') {
+      autonomousTarget.update();
+      target = autonomousTarget;
+    } else {
+      target = mouseTarget;
+    }
   }
 
   const currentMaxSpeed = Number(vitesseMaxSlider ? vitesseMaxSlider.value : 4);
@@ -321,7 +410,7 @@ function draw() {
     // Mise à jour dynamique des paramètres pilotés par les sliders
     vehicle.maxSpeed = currentMaxSpeed;
     vehicle.maxForce = currentMaxForce;
-    vehicle.mode = currentMode;
+    vehicle.mode = (currentScenario === '2') ? 'seek' : currentMode;
 
     // 1. Steering behavior (Seek ou Flee)
     vehicle.applyBehaviors(target.pos);
@@ -340,8 +429,12 @@ function draw() {
       // Effet sonore d'atteinte de la cible
       if (soundEffects) soundEffects.playImpact();
 
-      if (arrivalVariant === 'target') {
-        // Variante : la cible réapparaît aléatoirement
+      if (currentScenario === '2') {
+        // Scénario 2 : Le prédateur touche la cible fuyante
+        vehicle.pos.set(random(width), random(height));
+        vehicle.vel.set(0, 0);
+      } else if (arrivalVariant === 'target') {
+        // Variante Scénario 1 : la cible réapparaît aléatoirement
         if (targetType === 'autonomous') {
           autonomousTarget.respawnRandom(width, height);
         } else {
@@ -349,7 +442,7 @@ function draw() {
           vehicle.vel.set(0, 0);
         }
       } else {
-        // Cas standard : le véhicule réapparaît aléatoirement
+        // Scénario 1 standard : le véhicule réapparaît aléatoirement
         vehicle.pos.set(random(width), random(height));
         vehicle.vel.set(0, 0);
       }
@@ -358,7 +451,11 @@ function draw() {
     vehicle.show();
   }
 
-  target.show();
+  if (currentScenario === '2') {
+    fleeingTarget.show(debugMode);
+  } else {
+    target.show();
+  }
 }
 
 function windowResized() {

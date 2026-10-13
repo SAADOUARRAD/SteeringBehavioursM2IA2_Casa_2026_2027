@@ -65,7 +65,7 @@ class Snake extends Vehicle {
     this.tongueOut++;
   }
 
-  tryEat(foods, particles) {
+  tryEat(foods, particles, numParticles = 18) {
     for (let i = 0; i < foods.length; i++) {
       let f = foods[i];
       if (f.eaten) continue;
@@ -74,7 +74,7 @@ class Snake extends Vehicle {
         f.eaten = true;
         this.score++;
         this.glowTimer = 25;
-        for (let p = 0; p < 18; p++) {
+        for (let p = 0; p < numParticles; p++) {
           particles.push(new ParticleEffect(f.pos.x, f.pos.y, f.hue));
         }
         this._addSegment();

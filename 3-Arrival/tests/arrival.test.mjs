@@ -78,6 +78,23 @@ const HandTarget     = globalThis.HandTarget;
 load('Snake.js');
 const Snake          = globalThis.Snake;
 
+// SoundManager : stub AudioContext pour l'env Node
+global.AudioContext = class {
+  createGain()          { return { gain: { value:0, setTargetAtTime:()=>{}, setValueAtTime:()=>{}, exponentialRampToValueAtTime:()=>{}}, connect:()=>{} }; }
+  createOscillator()    { return { type:'sine', frequency:{ value:0, setValueAtTime:()=>{}, exponentialRampToValueAtTime:()=>{}, linearRampToValueAtTime:()=>{}, setTargetAtTime:()=>{} }, connect:()=>{}, start:()=>{}, stop:()=>{} }; }
+  createBiquadFilter()  { return { type:'lowpass', frequency:{ value:0, setTargetAtTime:()=>{}}, Q:{ value:0 }, connect:()=>{} }; }
+  createBuffer(ch,len,sr){ return { getChannelData:()=>new Float32Array(len) }; }
+  createBufferSource()  { return { buffer:null, loop:false, connect:()=>{}, start:()=>{}, stop:()=>{} }; }
+  resume()              { return Promise.resolve(); }
+  get state()           { return 'running'; }
+  get sampleRate()      { return 44100; }
+  get currentTime()     { return 0; }
+};
+global.window = { AudioContext: global.AudioContext };
+
+load('SoundManager.js');
+const SoundManager = globalThis.SoundManager;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TESTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -268,5 +285,72 @@ describe('Snake', () => {
     const s = new Snake(0, 0, 110);
     s.steerToward(new Vec2(5000, 0));
     assert.ok(s.acc.mag() <= s.maxForce + 0.001);
+  });
+});
+
+describe('SoundManager', () => {
+  it('est instanciable sans erreur', () => {
+    assert.doesNotThrow(() => new SoundManager());
+  });
+
+  it('démarre non prêt (ctx null avant init)', () => {
+    const sm = new SoundManager();
+    assert.equal(sm.ctx, null);
+    assert.equal(sm._ready, false);
+  });
+
+  it('init() crée le contexte et _ready = true', () => {
+    const sm = new SoundManager();
+    sm.init();
+    assert.equal(sm._ready, true);
+    assert.ok(sm.ctx !== null);
+  });
+
+  it('enabled est true par défaut', () => {
+    assert.equal(new SoundManager().enabled, true);
+  });
+
+  it('setEnabled(false) met enabled à false', () => {
+    const sm = new SoundManager(); sm.init();
+    sm.setEnabled(false);
+    assert.equal(sm.enabled, false);
+  });
+
+  it('setVolume() met à jour this.volume', () => {
+    const sm = new SoundManager(); sm.init();
+    sm.setVolume(0.3);
+    assert.ok(Math.abs(sm.volume - 0.3) < 0.001);
+  });
+
+  it('playEat() ne lance pas d\'erreur (activé)', () => {
+    const sm = new SoundManager(); sm.init();
+    assert.doesNotThrow(() => sm.playEat(120));
+  });
+
+  it('playEat() ne lance pas d\'erreur (désactivé)', () => {
+    const sm = new SoundManager(); sm.init(); sm.setEnabled(false);
+    assert.doesNotThrow(() => sm.playEat(240));
+  });
+
+  it('playGrow() ne lance pas d\'erreur', () => {
+    const sm = new SoundManager(); sm.init();
+    assert.doesNotThrow(() => sm.playGrow());
+  });
+
+  it('playBurst() ne lance pas d\'erreur', () => {
+    const sm = new SoundManager(); sm.init();
+    assert.doesNotThrow(() => sm.playBurst());
+  });
+
+  it('updateAmbient() ne lance pas d\'erreur', () => {
+    const sm = new SoundManager(); sm.init();
+    assert.doesNotThrow(() => sm.updateAmbient(8.5));
+  });
+
+  it('_map() est correct', () => {
+    const sm = new SoundManager();
+    assert.ok(Math.abs(sm._map(0.5, 0, 1,  0, 100) -  50) < 0.001);
+    assert.ok(Math.abs(sm._map(0,   0, 1, 10,  20) -  10) < 0.001);
+    assert.ok(Math.abs(sm._map(1,   0, 1, 10,  20) -  20) < 0.001);
   });
 });

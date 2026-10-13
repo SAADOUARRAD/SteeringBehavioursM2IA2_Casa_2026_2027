@@ -1,19 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Sketch</title>
-
+    <title>3-Arrival — Serpents Steering</title>
     <link rel="stylesheet" type="text/css" href="style.css">
 
+    <!-- P5.js -->
     <script src="libraries/p5.min.js"></script>
     <script src="libraries/p5.sound.min.js"></script>
+
+    <!-- MediaPipe Hands (optionnel — graceful fallback si absent) -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+    <!-- Entités (ordre de chargement important) -->
     <script src="vehicle.js"></script>
+    <script src="Food.js"></script>
+    <script src="SnakeSegment.js"></script>
+    <script src="ParticleEffect.js"></script>
+    <script src="HandTarget.js"></script>
+    <script src="Snake.js"></script>
+
+    <!-- Sketch principal -->
     <script src="sketch.js"></script>
   </head>
   <body>
-    <!-- Pas besoin de déclarer un canvas pour dessiner en P5.js -->
+    <!-- Vidéo cachée pour MediaPipe -->
+    <video id="mediapipe-video" style="display:none;" playsinline></video>
   </body>
 </html>

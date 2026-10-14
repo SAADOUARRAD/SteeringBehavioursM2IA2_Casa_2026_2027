@@ -3,85 +3,72 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seek & Flee — Exercices Steering Behaviors</title>
+    <title>Seek — population de véhicules</title>
     <link rel="stylesheet" href="style.css">
     <script src="libraries/p5.min.js"></script>
+    <script src="libraries/audio.js"></script>
+    <script src="libraries/jsfx.js"></script>
+    <script src="libraries/jsfxlib.js"></script>
+    <script src="libraries/webaudiox.js"></script>
     <script src="vehicle.js"></script>
-    <script src="FollowerVehicle.js"></script>
-    <script src="target.js"></script>
-    <script src="targetFuyante.js"></script>
-    <script src="mouseTarget.js"></script>
-    <script src="soundEffects.js"></script>
     <script src="population.js"></script>
+    <script src="seekVehicle.js"></script>
+    <script src="target.js"></script>
+    <script src="targetFutante.js"></script>
+    <script src="scenarios.js"></script>
+    <script src="audio.js"></script>
+    <script src="effectsAudio.js"></script>
     <script src="sketch.js"></script>
   </head>
   <body>
     <header id="controls">
-      <div class="control-group">
-        <label for="scenario-select">Scénario :</label>
-        <select id="scenario-select">
-          <option value="1" selected>Scénario 1 : Suiveurs & Réapparition</option>
-          <option value="2">Scénario 2 : Cible Fuyante (Flee)</option>
-        </select>
-      </div>
-
-      <div class="control-group group-scenario-2" id="group-detection-radius" style="display: none;">
-        <label for="detection-radius">Rayon Détection :</label>
-        <input id="detection-radius" type="range" min="50" max="400" step="10" value="200">
+      <label for="scenario">Scénario :</label>
+      <select id="scenario">
+        <option value="normal">1 — Suivi de cible et réapparition</option>
+        <option value="flee">2 — La cible fuit les vaisseaux</option>
+      </select>
+      <label><input id="debug" type="checkbox"> Debug (D)</label>
+      <fieldset id="flee-controls" hidden>
+        <legend>Fuite et endurance</legend>
+        <label for="detection-radius">Détection :</label>
+        <input id="detection-radius" type="range" min="50" max="500" step="1" value="200">
         <output id="detection-radius-value">200 px</output>
-      </div>
-
-      <div class="control-group group-scenario-2" id="group-flee-duration" style="display: none;">
-        <label for="flee-duration">Durée Fuite Max :</label>
-        <input id="flee-duration" type="range" min="0.5" max="6.0" step="0.1" value="2.5">
+        <label for="exit-distance">Distance de sécurité :</label>
+        <input id="exit-distance" type="range" min="100" max="800" step="1" value="300">
+        <output id="exit-distance-value">300 px</output>
+        <label for="flee-duration">Durée max :</label>
+        <input id="flee-duration" type="range" min="0.5" max="10" step="0.1" value="2.5">
         <output id="flee-duration-value">2.5 s</output>
-      </div>
-
-      <div class="control-group">
-        <label for="vehicle-count">Véhicules :</label>
-        <input id="vehicle-count" type="range" min="1" max="200" step="1" value="20">
-        <output id="vehicle-count-value">20 / 200</output>
-      </div>
-
-      <div class="control-group">
-        <label for="vitesse-max">Vitesse Max :</label>
-        <input id="vitesse-max" type="range" min="1" max="20" step="1" value="4">
-        <output id="vitesse-max-value">4</output>
-      </div>
-
-      <div class="control-group">
-        <label for="force-max">Force Max :</label>
-        <input id="force-max" type="range" min="0.01" max="1" step="0.01" value="0.1">
-        <output id="force-max-value">0.1</output>
-      </div>
-
-      <div class="control-group">
-        <button id="toggle-mode" type="button">Mode : Seek</button>
-        <button id="toggle-target" type="button">Cible : Souris</button>
-        <button id="toggle-variant" type="button">Arrivée : Véhicule réapparaît</button>
-        <button id="toggle-sound" type="button" title="Activer ou couper le son">🔊 Son : ON</button>
-        <button id="toggle-debug" type="button" title="Activer / désactiver le mode debug (touche 'd')">🛠️ Debug [D] : OFF</button>
-      </div>
-
-      <div class="control-group">
-        <label for="bg-select">Fond :</label>
-        <select id="bg-select">
-          <option value="rainbow_wave" selected>🌈 Ondes Néon Psychédéliques (Clignotant & Mouvement)</option>
-          <option value="#000000">Noir</option>
-          <option value="#0b132b">Bleu nuit</option>
-          <option value="#1c2541">Bleu profond</option>
-          <option value="#1a1a24">Gris sombre</option>
-          <option value="#0d1b1e">Vert sombre</option>
-          <option value="#240046">Violet cosmique</option>
-          <option value="stars">✨ Étoilé</option>
-          <option value="grid">🌐 Grille Cyber</option>
-          <option value="custom">🎨 Personnalisé</option>
-        </select>
-        <input id="bg-color-picker" type="color" value="#000000" title="Choisir une couleur personnalisée">
-      </div>
-
-      <span class="hint">Survolez le canvas ou activez la cible mobile.</span>
+      </fieldset>
+      <label for="vehicle-count">Véhicules :</label>
+      <input id="vehicle-count" type="range" min="1" max="200" step="1" value="20">
+      <output id="vehicle-count-value" for="vehicle-count">20 / 200</output>
+      <span class="hint">La cible se déplace seule ; les véhicules la poursuivent.</span>
+      <label for="target-count">Cibles :</label>
+      <input id="target-count" type="range" min="1" max="30" step="1" value="4">
+      <output id="target-count-value" for="target-count">4 / 30</output>
+      <label for="max-speed">Vitesse max :</label>
+      <input id="max-speed" type="range" min="0" max="20" step="0.1" value="4">
+      <output id="max-speed-value" for="max-speed">4</output>
+      <label for="max-force">Force max :</label>
+      <input id="max-force" type="range" min="0" max="10" step="0.01" value="0.1">
+      <output id="max-force-value" for="max-force">0.10</output>
+      <label for="gradient-speed">Vitesse du dégradé :</label>
+      <input id="gradient-speed" type="range" min="0" max="2" step="0.01" value="0.35">
+      <output id="gradient-speed-value" for="gradient-speed">0.35</output>
+      <label for="gradient-depth">Intensité :</label>
+      <input id="gradient-depth" type="range" min="0" max="1" step="0.01" value="0.75">
+      <output id="gradient-depth-value" for="gradient-depth">0.75</output>
+      <button id="audio-toggle" type="button" aria-pressed="false">Activer la musique et les effets</button>
+      <label for="music-volume">Volume musique :</label>
+      <input id="music-volume" type="range" min="0" max="1" step="0.01" value="0.07">
+      <output id="music-volume-value" for="music-volume">0.07</output>
+      <label for="effects-volume">Volume effets :</label>
+      <input id="effects-volume" type="range" min="0" max="1" step="0.01" value="0.35">
+      <output id="effects-volume-value" for="effects-volume">0.35</output>
+      <span class="hint">Alarmes et sweep de fuite : scénario 2 « La cible fuit les vaisseaux ».</span>
+      <span class="hint">Souris : X = filtre et FM, Y = hauteur. Le centre du dégradé suit le pointeur.</span>
     </header>
-    <main id="scene" aria-label="Simulation de véhicules suiveurs"></main>
+    <main id="scene" aria-label="Simulation de véhicules poursuivant une cible"></main>
   </body>
 </html>

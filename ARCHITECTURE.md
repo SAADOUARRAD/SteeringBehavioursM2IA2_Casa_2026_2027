@@ -25,3 +25,16 @@ Garder chaque comportement indépendant, réutilisable et testable. Les entités
 ## Tests
 
 Chaque nouvelle fonctionnalité d'un exemple doit être accompagnée de tests unitaires pertinents, exécutés avant de présenter la modification comme terminée. Consulter [`AGENTS.md`](AGENTS.md) pour les attentes de couverture, la reproductibilité de l'aléatoire et la communication du résultat des tests.
+
+## Scénarios de 1-Seek
+
+`SeekScenarios` conserve deux collections parallèles de cibles normales et fuyantes. Le passage d'un scénario à l'autre réinitialise les états de fuite, sans recréer les véhicules. Toutes les cibles du scénario actif sont mises à jour ; `SeekPopulation.nearestTarget()` choisit ensuite la cible la plus proche de chaque véhicule.
+
+`Target extends Vehicle` porte l'animation normale : direction aléatoire pilotée par `seek()`, changement de taille et de couleur selon une horloge locale. `TargetFutante extends Target`, dans `targetFutante.js`, ajoute la perception et les états normal/fuite/épuisement. La fuite utilise `super.flee()`, les forces passent par `applyForce()` et l'intégration héritée n'est exécutée qu'une fois par image. `SeekVehicle extends Vehicle` spécialise seulement l'affichage du vecteur de vitesse selon le debug.
+
+Les rayons de déclenchement et de sortie sont distincts. Le plus proche des prédateurs est recherché pendant la fuite même au-delà du cercle de détection ; la durée borne l'épisode et l'épuisement impose un retour en sécurité avant réarmement. L'endurance et la couleur de perception sont des lectures de cet état.
+
+Toutes les entités graphiques du monde, mobiles ou momentanément immobiles, héritent de Vehicle. Les commandes HTML, le dégradé et les indicateurs restent du rendu. Les téléportations de réapparition sont des règles explicites de scène, distinctes du steering. Aucun fichier `vehicle.js` n'est modifié par cette évolution.
+Le scénario possède maintenant deux collections parallèles de cibles (`normalTargets` et `fleeingTargets`). `SeekPopulation.nearestTarget()` choisit la cible la plus proche d'un véhicule avant l'appel à `seek`; la logique de scène ne duplique pas le calcul de steering. Le curseur de cibles conserve les instances existantes autant que possible et crée les nouvelles cibles avec la même classe que leur collection.
+
+`SeekEffectsAudio` centralise les effets synthétiques. Il reçoit le contexte de `PsychedelicAudio`, génère ses buffers avec WebAudioX/jsfx, puis suit les transitions d'état des cibles. Les sources de fuite sont indexées par instance de cible afin de permettre plusieurs fuites simultanées ; le cooldown d'alarme est également indexé par instance.

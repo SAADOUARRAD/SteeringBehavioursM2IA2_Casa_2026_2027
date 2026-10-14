@@ -17,10 +17,10 @@ class Vector {
 function scene(w = 800, h = 600) {
   const context = vm.createContext({ createVector: (x, y) => new Vector(x, y),
     p5: { Vector }, width: w, height: h });
-  for (const file of ['vehicle.js', 'population.js', 'mouseTarget.js']) {
+  for (const file of ['vehicle.js', 'population.js']) {
     vm.runInContext(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), context);
   }
-  return vm.runInContext('({ Vehicle, MouseTarget, population: SeekPopulation })', context);
+  return vm.runInContext('({ Vehicle, population: SeekPopulation })', context);
 }
 const rng = () => 0.1;
 const target = new Vector(400, 300);
@@ -52,6 +52,18 @@ test('slider : input met à jour population et compteur sans change', () => {
   assert.equal(events.change, undefined);
 });
 
+test('limites : vitesse et force sont appliquées à toute la population', () => {
+  const { Vehicle, population: p } = scene();
+  const vehicles = [new Vehicle(0, 0), new Vehicle(10, 10)];
+  vehicles[0].vel.set(20, 0);
+  p.setLimits(vehicles, 7, 2.5);
+  for (const vehicle of vehicles) {
+    assert.equal(vehicle.maxSpeed, 7);
+    assert.equal(vehicle.maxForce, 2.5);
+    assert.ok(vehicle.vel.mag() <= 7);
+  }
+});
+
 test('edges fourni : quatre seuils stricts, angles et vitesse conservée', () => {
   const { Vehicle } = scene();
   for (const [x, y, expectedX, expectedY] of [
@@ -81,9 +93,9 @@ test('seek fourni : forces proches/lointaines limitées et cible intacte', () =>
 
 test('arrivée : seuil inclusif, même instance et paramètres préservés', () => {
   const { Vehicle, population: p } = scene();
-  const v = new Vehicle(416.01, 300);
+  const v = new Vehicle(432.01, 300);
   assert.equal(p.hasArrived(v, target), false);
-  v.pos.x = 416; assert.equal(p.hasArrived(v, target), true);
+  v.pos.x = 432; assert.equal(p.hasArrived(v, target), true);
   v.vel.set(3, 1); v.acc.set(1, 2);
   const parameters = [v.r, v.maxSpeed, v.maxForce];
   p.step(v, target, 800, 600, rng);
@@ -113,7 +125,7 @@ test('tirage : marges, repli déterministe borné, petite géométrie impossible
   let calls = 0;
   const fallback = p.spawnPosition(target, 800, 600, 16, () => { calls++; return 0.5; });
   assert.equal(calls, 64); assert.equal(fallback.x, 16); assert.equal(fallback.y, 16);
-  assert.ok(p.spawnPosition(new Vector(20, 20), 40, 40, 16, () => 0.5));
+  assert.equal(p.spawnPosition(new Vector(20, 20), 40, 40, 16, () => 0.5), null);
   const smallTarget = new Vector(5, 5);
   assert.equal(p.spawnPosition(smallTarget, 10, 10, 16, rng), null);
   const v = new Vehicle(5, 5); v.vel.set(1, 2);
@@ -133,9 +145,4 @@ test('population : arrivées simultanées et véhicules supprimés non mis à jo
   const removed = vehicles[1]; removed.update = () => assert.fail('Véhicule supprimé');
   p.resize(vehicles, 1, target, 800, 600, () => assert.fail('Création inutile'));
   for (const v of vehicles) p.step(v, target, 800, 600, rng);
-});
-
-test('MouseTarget hérite de Vehicle et garde le rayon visuel attendu', () => {
-  const { Vehicle, MouseTarget } = scene(); const t = new MouseTarget(50, 60);
-  assert.ok(t instanceof Vehicle); assert.equal(t.r, 16); assert.equal(t.vel.mag(), 0);
 });

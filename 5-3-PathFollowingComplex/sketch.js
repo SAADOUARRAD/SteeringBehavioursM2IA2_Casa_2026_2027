@@ -1,12 +1,13 @@
 /**
- * 5-3 Path Following Complex — Grand Prix Moto & Circuits Multi-Niveaux
+ * 5-3 Path Following Complex — Grand Prix Moto, Circuits Multi-Niveaux & Sons Réels
  *
  * Implémentation complète :
  * - Motos de course GP (`Moto` hérite de `Vehicle`) suivant le circuit et évitant les collisions
  * - Équipes / Pelotons en aspiration (`MotoSquad` hérite de `Vehicle`)
  * - Particules d'échappement & flammes de Nitro (`ExhaustParticle` hérite de `Vehicle`)
+ * - Moteur sonore Web Audio réaliste (`MotoAudio`) : rugissement moteur 4-temps modulé par les RPM et klaxon bi-ton
  * - 4 Niveaux de circuits progressifs (Speedway, Monza, Monaco Nocturne, Figure 8)
- * - Séparation active et intelligente pour empêcher tout chevauchement entre motos
+ * - Déclenchement automatique du klaxon en cas de situation de dépassement serré
  * - Touche "'" (apostrophe / quote) pour créer instantanément de nouvelles motos
  * - Mode debug complet (touche 'd') avec télémétrie de course
  */
@@ -14,6 +15,9 @@
 let debug = false;
 let path;
 let currentLevelIndex = 0;
+
+// Moteur Audio Synthétisé
+let motoAudio;
 
 // Collections d'entités
 let motos = [];
@@ -32,18 +36,21 @@ let selectLevel;
 let sliderFollow, valFollow;
 let sliderSeparate, valSeparate;
 let sliderSpeed, valSpeed;
-let btnAddMoto, btnAddSquad, btnNitro, btnDebug, btnNextLevel, btnClear;
+let btnAddMoto, btnAddSquad, btnKlaxon, btnNitro, btnAudio, btnDebug, btnNextLevel, btnClear;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
 
-  // 1. Initialisation du premier niveau
+  // 1. Initialisation du moteur audio Web Audio
+  motoAudio = new MotoAudio();
+
+  // 2. Initialisation du premier niveau
   loadLevel(currentLevelIndex);
 
-  // 2. Liaison des contrôles UI
+  // 3. Liaison des contrôles UI
   bindUIControls();
 
-  // 3. Grille de départ : 4 motos individuelles et 1 écurie en aspiration
+  // 4. Grille de départ : 4 motos individuelles et 1 écurie en aspiration
   spawnInitialRacers();
 }
 
@@ -70,26 +77,62 @@ function draw() {
     v.run();
   }
 
-  // 5. Mise à jour et pilotage des motos individuelles
+  // 5. Suivi des métriques sonores (vitesse max, nitro, freinages intenses, klaxon automatique)
+  let topSpeed = 0;
+  let anyNitro = false;
+  let anyBraking = false;
+  let closeEncounterDetected = false;
+
+  // 6. Mise à jour et pilotage des motos individuelles
   for (let m of motos) {
     m.followPathWeight = followPathWeight;
     m.separateWeight = separateWeight;
-    // La moto évite tous les autres bolides sauf elle-même
+
     let otherEntities = allObstacles.filter((b) => b !== m);
     m.applyBehaviors(otherEntities, path, particles);
     m.update();
     m.render(debug);
+
+    let spd = m.vel.mag();
+    if (spd > topSpeed) topSpeed = spd;
+    if (m.isNitro) anyNitro = true;
+    if (m.isBraking) anyBraking = true;
+
+    // Détection d'un dépassement serré avec un autre bolide (distance < 28px)
+    for (let other of otherEntities) {
+      if (p5.Vector.dist(m.pos, other.pos) < m.r * 1.8) {
+        closeEncounterDetected = true;
+        break;
+      }
+    }
   }
 
-  // 6. Mise à jour des écuries en aspiration (MotoSquad)
+  // 7. Mise à jour des écuries en aspiration (MotoSquad)
   for (let sq of squads) {
     sq.setWeights(followPathWeight, separateWeight);
     let otherEntities = allObstacles.filter((b) => !sq.getBikes().includes(b));
     sq.applyBehaviors(otherEntities, path, particles);
     sq.render(debug);
+
+    for (let b of sq.getBikes()) {
+      let spd = b.vel.mag();
+      if (spd > topSpeed) topSpeed = spd;
+      if (b.isNitro) anyNitro = true;
+      if (b.isBraking) anyBraking = true;
+    }
   }
 
-  // 7. Particules d'échappement et nitro
+  // 8. Modulation en temps réel du rugissement moteur de moto
+  if (motoAudio) {
+    motoAudio.updateEngine(topSpeed, anyNitro, anyBraking);
+
+    // Klaxon automatique si situation de dépassement à haut risque (1 chance sur 120 frames)
+    if (closeEncounterDetected && frameCount % 60 === 0 && random() < 0.35) {
+      motoAudio.playKlaxon();
+    }
+  }
+
+  // 9. Particules d'échappement et nitro
   for (let i = particles.length - 1; i >= 0; i--) {
     let p = particles[i];
     p.update();
@@ -99,7 +142,7 @@ function draw() {
     }
   }
 
-  // 8. Télémétrie et diagnostics en mode debug
+  // 10. Télémétrie et diagnostics en mode debug
   if (debug) {
     drawDebugOverlay(allBikes.length);
   }
@@ -171,10 +214,11 @@ function spawnInitialRacers() {
  * Déclenché par la touche "'" (apostrophe) ou le bouton UI
  */
 function addMoto(x, y) {
+  if (motoAudio) motoAudio.init();
+
   let posX = x !== undefined ? x : mouseX;
   let posY = y !== undefined ? y : mouseY;
 
-  // Si position hors champ ou sur les contrôles
   if (posX <= 10 || posX >= width - 10 || posY <= 60 || posY >= height - 10) {
     let randPt = path.points[Math.floor(random(path.points.length))];
     posX = randPt.x + random(-12, 12);
@@ -185,6 +229,9 @@ function addMoto(x, y) {
   m.followPathWeight = followPathWeight;
   m.separateWeight = separateWeight;
   motos.push(m);
+
+  // Petit coup de gaz sonore à l'arrivée d'une moto
+  if (motoAudio) motoAudio.playBackfire();
   return m;
 }
 
@@ -192,6 +239,8 @@ function addMoto(x, y) {
  * Ajoute une écurie de 3 motos en formation d'aspiration
  */
 function addMotoSquad(x, y) {
+  if (motoAudio) motoAudio.init();
+
   let posX = x !== undefined ? x : mouseX;
   let posY = y !== undefined ? y : mouseY;
 
@@ -211,6 +260,7 @@ function addMotoSquad(x, y) {
  * Déclenche le Nitro pour toutes les motos
  */
 function triggerGlobalNitro() {
+  if (motoAudio) motoAudio.init();
   for (let m of motos) m.triggerNitro(90);
   for (let sq of squads) sq.triggerNitro(90);
 }
@@ -220,20 +270,15 @@ function triggerGlobalNitro() {
  */
 function drawTrackEnvironment(level) {
   if (level.id === 3) {
-    // Ambiance urbaine nocturne : bitume bleu-nuit, lumières citadines
     background(10, 13, 20);
-    // Légers halos d'éclairage urbain
     noStroke();
     fill(0, 180, 255, 6);
     circle(width * 0.25, height * 0.3, 400);
     circle(width * 0.75, height * 0.7, 450);
   } else if (level.id === 4) {
-    // Ambiance technologique futuriste
     background(14, 16, 24);
   } else {
-    // Ambiance Grand Prix classique : pelouse verte avec relief
     background(24, 38, 26);
-    // Bandes de pelouse tondue
     noStroke();
     fill(28, 44, 30);
     for (let y = 0; y < height; y += 40) {
@@ -260,9 +305,8 @@ function drawRacetrack(p, level) {
   for (let pt of p.points) vertex(pt.x, pt.y);
   endShape(CLOSE);
 
-  // 2. Vibreurs bicolores sur les bords (rouge & blanc ou cyan & vert)
+  // 2. Vibreurs bicolores sur les bords
   let curbCol1 = level.curbColors[0];
-  let curbCol2 = level.curbColors[1];
   stroke(curbCol1);
   strokeWeight(p.radius * 2 + 8);
   beginShape();
@@ -277,7 +321,7 @@ function drawRacetrack(p, level) {
   for (let pt of p.points) vertex(pt.x, pt.y);
   endShape(CLOSE);
 
-  // 4. Ligne médiane blanche discontinue (marquage de voie)
+  // 4. Ligne médiane blanche discontinue
   stroke(220, 225, 235, 110);
   strokeWeight(1.8);
   beginShape();
@@ -297,12 +341,11 @@ function drawStartFinishLine(p1, p2, trackRadius) {
   if (!p1 || !p2) return;
   push();
   let dir = p5.Vector.sub(p2, p1).normalize();
-  let normal = createVector(-dir.y, dir.x); // Perpendiculaire à la piste
+  let normal = createVector(-dir.y, dir.x);
 
   let leftPt = p5.Vector.add(p1, p5.Vector.mult(normal, trackRadius));
   let rightPt = p5.Vector.sub(p1, p5.Vector.mult(normal, trackRadius));
 
-  // Damier
   let steps = 8;
   for (let i = 0; i < steps; i++) {
     let t1 = i / steps;
@@ -314,7 +357,6 @@ function drawStartFinishLine(p1, p2, trackRadius) {
     line(ptA.x, ptA.y, ptB.x, ptB.y);
   }
 
-  // Panneau START / FINISH
   noStroke();
   fill(255, 215, 0);
   textSize(9);
@@ -338,7 +380,9 @@ function bindUIControls() {
 
   btnAddMoto = document.getElementById('btn-add-moto');
   btnAddSquad = document.getElementById('btn-add-squad');
+  btnKlaxon = document.getElementById('btn-klaxon');
   btnNitro = document.getElementById('btn-nitro');
+  btnAudio = document.getElementById('btn-audio');
   btnDebug = document.getElementById('btn-debug');
   btnNextLevel = document.getElementById('btn-next-level');
   btnClear = document.getElementById('btn-clear');
@@ -380,8 +424,27 @@ function bindUIControls() {
     btnAddSquad.addEventListener('click', () => addMotoSquad(mouseX, mouseY));
   }
 
+  if (btnKlaxon) {
+    btnKlaxon.addEventListener('click', () => {
+      if (motoAudio) {
+        motoAudio.init();
+        motoAudio.playKlaxon();
+      }
+    });
+  }
+
   if (btnNitro) {
     btnNitro.addEventListener('click', triggerGlobalNitro);
+  }
+
+  if (btnAudio) {
+    btnAudio.addEventListener('click', () => {
+      if (motoAudio) {
+        motoAudio.init();
+        let state = motoAudio.toggle();
+        btnAudio.textContent = state ? '🔊 Son : ON' : '🔇 Son : OFF';
+      }
+    });
   }
 
   if (btnDebug) {
@@ -445,10 +508,20 @@ function drawDebugOverlay(totalBikes) {
 /**
  * Gestion du clavier
  * Touche "'" (apostrophe / quote) -> Ajoute une nouvelle moto de course
+ * Touche "k" ou "h" -> Déclenche le klaxon de course
  */
 function keyPressed(event) {
+  if (motoAudio) motoAudio.init();
+
   if (key === "'" || (event && (event.key === "'" || event.code === 'Quote'))) {
     addMoto(mouseX, mouseY);
+  } else if (key === 'k' || key === 'K' || key === 'h' || key === 'H') {
+    if (motoAudio) motoAudio.playKlaxon();
+  } else if (key === 'm' || key === 'M') {
+    if (motoAudio) {
+      let state = motoAudio.toggle();
+      if (btnAudio) btnAudio.textContent = state ? '🔊 Son : ON' : '🔇 Son : OFF';
+    }
   } else if (key === 'd' || key === 'D') {
     toggleDebug();
   } else if (key === 'n' || key === 'N') {
@@ -460,7 +533,12 @@ function keyPressed(event) {
   }
 }
 
+function mousePressed() {
+  if (motoAudio) motoAudio.init();
+}
+
 function mouseDragged() {
+  if (motoAudio) motoAudio.init();
   const controlsEl = document.getElementById('controls');
   if (controlsEl && mouseY < controlsEl.offsetHeight + 15) return;
   if (frameCount % 6 === 0) {

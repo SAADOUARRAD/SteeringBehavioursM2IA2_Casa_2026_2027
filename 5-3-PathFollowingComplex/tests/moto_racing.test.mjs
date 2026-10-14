@@ -132,10 +132,60 @@ new Function(levelsCode + '\nglobalThis.RACING_LEVELS = RACING_LEVELS; globalThi
 const RACING_LEVELS = globalThis.RACING_LEVELS;
 global.RACING_LEVELS = RACING_LEVELS;
 
+// AudioContext stubs pour l'environnement Node
+global.AudioContext = class {
+  createGain() {
+    return {
+      gain: {
+        value: 0,
+        setTargetAtTime: () => {},
+        setValueAtTime: () => {},
+        exponentialRampToValueAtTime: () => {}
+      },
+      connect: () => {}
+    };
+  }
+  createOscillator() {
+    return {
+      type: 'sine',
+      frequency: {
+        value: 0,
+        setValueAtTime: () => {},
+        exponentialRampToValueAtTime: () => {},
+        setTargetAtTime: () => {}
+      },
+      connect: () => {},
+      start: () => {},
+      stop: () => {}
+    };
+  }
+  createBiquadFilter() {
+    return {
+      type: 'lowpass',
+      frequency: { value: 0, setValueAtTime: () => {}, setTargetAtTime: () => {} },
+      Q: { value: 0 },
+      connect: () => {}
+    };
+  }
+  createBuffer(ch, len, sr) {
+    return { getChannelData: () => new Float32Array(len) };
+  }
+  createBufferSource() {
+    return { buffer: null, loop: false, connect: () => {}, start: () => {}, stop: () => {} };
+  }
+  resume() { return Promise.resolve(); }
+  get state() { return 'running'; }
+  get sampleRate() { return 44100; }
+  get currentTime() { return 0; }
+};
+global.window = { AudioContext: global.AudioContext };
+
+loadCode('MotoAudio.js');
 loadCode('ExhaustParticle.js');
 loadCode('Moto.js');
 loadCode('MotoSquad.js');
 
+const MotoAudio = globalThis.MotoAudio;
 const ExhaustParticle = globalThis.ExhaustParticle;
 const Moto = globalThis.Moto;
 const MotoSquad = globalThis.MotoSquad;
@@ -276,5 +326,58 @@ describe('5-3 Moto Racing & Circuits Multi-Niveaux', () => {
     const vit2 = Math.abs(m2.vel.x);
 
     assert.ok(vit2 >= vit1, 'Un poids de séparation supérieur doit induire une répulsion plus forte');
+  });
+
+  describe('MotoAudio — Sons Moteur & Klaxons', () => {
+    it('est instanciable et démarre non initialisé', () => {
+      const audio = new MotoAudio();
+      assert.equal(audio._ready, false);
+      assert.equal(audio.enabled, true);
+    });
+
+    it('init() active le contexte et les oscillateurs de moteur', () => {
+      const audio = new MotoAudio();
+      audio.init();
+      assert.equal(audio._ready, true);
+      assert.ok(audio.ctx !== null);
+      assert.ok(audio.engineOsc1 !== null);
+    });
+
+    it('updateEngine() module les RPM et le filtre selon la vitesse', () => {
+      const audio = new MotoAudio();
+      audio.init();
+      assert.doesNotThrow(() => {
+        audio.updateEngine(3.5, false, false);
+        audio.updateEngine(8.0, true, false); // Avec Nitro
+        audio.updateEngine(2.0, false, true); // En freinage
+      });
+    });
+
+    it('playKlaxon() joue le klaxon bi-ton sans erreur', () => {
+      const audio = new MotoAudio();
+      audio.init();
+      assert.doesNotThrow(() => audio.playKlaxon());
+    });
+
+    it('playBackfire() génère un retour d échappement sans erreur', () => {
+      const audio = new MotoAudio();
+      audio.init();
+      assert.doesNotThrow(() => audio.playBackfire());
+    });
+
+    it('setVolume() et toggle() contrôlent le mixage sonore', () => {
+      const audio = new MotoAudio();
+      audio.init();
+      audio.setVolume(0.35);
+      assert.equal(audio.volume, 0.35);
+
+      const state = audio.toggle();
+      assert.equal(state, false);
+      assert.equal(audio.enabled, false);
+
+      const state2 = audio.toggle();
+      assert.equal(state2, true);
+      assert.equal(audio.enabled, true);
+    });
   });
 });

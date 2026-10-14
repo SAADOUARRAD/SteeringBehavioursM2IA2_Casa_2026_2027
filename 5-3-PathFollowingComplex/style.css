@@ -101,6 +101,17 @@ html, body {
   background: #ff6b6b;
 }
 
+#controls button.horn-btn {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: #ffffff;
+  border-color: #f1c40f;
+  font-weight: bold;
+}
+
+#controls button.horn-btn:hover {
+  background: linear-gradient(135deg, #f1c40f, #f39c12);
+}
+
 #controls button.nitro-btn {
   background: linear-gradient(135deg, #0984e3, #00cec9);
   color: #ffffff;

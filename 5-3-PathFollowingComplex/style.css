@@ -8,26 +8,27 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #14161d;
+  background: #0f121a;
   color: #e5e9f0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
 }
 
 #controls {
   position: fixed;
-  top: 12px;
-  left: 12px;
+  top: 10px;
+  left: 10px;
+  right: 10px;
   z-index: 100;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 18px;
+  gap: 10px 16px;
   padding: 10px 16px;
-  background: rgba(20, 24, 33, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 22, 32, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
 }
 
 .control-group {
@@ -38,27 +39,43 @@ html, body {
 
 #controls label {
   font-size: 13px;
-  font-weight: 500;
-  color: #a3be8c;
+  font-weight: 600;
+  color: #ff9f43;
+}
+
+#select-level {
+  background: #252b3b;
+  color: #f1f2f6;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#select-level:focus {
+  outline: none;
+  border-color: #ff9f43;
 }
 
 #controls input[type="range"] {
-  width: 110px;
-  accent-color: #a3be8c;
+  width: 95px;
+  accent-color: #ff9f43;
   cursor: pointer;
 }
 
 #controls output {
   font-size: 13px;
   font-weight: bold;
-  color: #88c0d0;
-  min-width: 38px;
+  color: #54a0ff;
+  min-width: 34px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 #controls button {
-  background: #2e3440;
+  background: #272d3d;
   color: #eceff4;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 6px;
@@ -70,17 +87,29 @@ html, body {
 }
 
 #controls button:hover {
-  background: #434c5e;
-  border-color: #88c0d0;
+  background: #3c445c;
+  border-color: #ff9f43;
 }
 
 #controls button.primary {
-  background: #2e7d32;
+  background: #ee5253;
   color: #ffffff;
+  border-color: #ff6b6b;
 }
 
 #controls button.primary:hover {
-  background: #388e3c;
+  background: #ff6b6b;
+}
+
+#controls button.nitro-btn {
+  background: linear-gradient(135deg, #0984e3, #00cec9);
+  color: #ffffff;
+  border-color: #74b9ff;
+  font-weight: bold;
+}
+
+#controls button.nitro-btn:hover {
+  background: linear-gradient(135deg, #74b9ff, #81ecec);
 }
 
 .hud-info {
@@ -89,17 +118,17 @@ html, body {
   left: 12px;
   z-index: 90;
   padding: 8px 14px;
-  background: rgba(15, 18, 26, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(14, 17, 26, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   font-size: 12px;
-  color: #d8dee9;
-  backdrop-filter: blur(4px);
+  color: #dfe4ea;
+  backdrop-filter: blur(6px);
   line-height: 1.6;
 }
 
 .hud-info b {
-  color: #ebcb8b;
+  color: #ff9f43;
 }
 
 canvas {

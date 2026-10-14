@@ -1,237 +1,353 @@
 /**
- * 5-3 Path Following Complex — Snakes & Véhicules
+ * 5-3 Path Following Complex — Grand Prix Moto & Circuits Multi-Niveaux
  *
- * Implémentation avancée :
- * - Suivi de chemin complexe multi-segments par les véhicules ET par les serpents
- * - Séparation active sur la tête ET sur tous les anneaux du serpent pour éviter
- *   toute superposition avec les véhicules en circulation
- * - Poids réglables en temps réel par curseurs pour le suivi de chemin et la séparation
- * - Touche "'" (apostrophe / quote) pour créer de nouveaux serpents
- * - Mode debug complet (touche 'd')
+ * Implémentation complète :
+ * - Motos de course GP (`Moto` hérite de `Vehicle`) suivant le circuit et évitant les collisions
+ * - Équipes / Pelotons en aspiration (`MotoSquad` hérite de `Vehicle`)
+ * - Particules d'échappement & flammes de Nitro (`ExhaustParticle` hérite de `Vehicle`)
+ * - 4 Niveaux de circuits progressifs (Speedway, Monza, Monaco Nocturne, Figure 8)
+ * - Séparation active et intelligente pour empêcher tout chevauchement entre motos
+ * - Touche "'" (apostrophe / quote) pour créer instantanément de nouvelles motos
+ * - Mode debug complet (touche 'd') avec télémétrie de course
  */
 
 let debug = false;
 let path;
+let currentLevelIndex = 0;
+
+// Collections d'entités
+let motos = [];
+let squads = [];
 let vehicles = [];
-let snakes = [];
+let particles = [];
 
-// Poids des forces réglables par curseurs
-let followPathWeight = 2.0;
-let separateWeight = 2.5;
-let snakeSpeed = 3.5;
-let targetVehicleCount = 10;
+// Paramètres de pilotage
+let followPathWeight = 2.2;
+let separateWeight = 2.8;
+let motoBaseSpeed = 4.2;
+let paceCarCount = 4;
 
-// Éléments de l'interface utilisateur
+// Éléments UI
+let selectLevel;
 let sliderFollow, valFollow;
 let sliderSeparate, valSeparate;
 let sliderSpeed, valSpeed;
-let sliderVehicles, valVehicles;
-let btnAddSnake, btnDebug, btnNewPath, btnClearSnakes;
+let btnAddMoto, btnAddSquad, btnNitro, btnDebug, btnNextLevel, btnClear;
 
 function setup() {
-  const controlsEl = document.getElementById('controls');
-  const availableHeight = windowHeight;
-  createCanvas(windowWidth, availableHeight);
+  createCanvas(windowWidth, windowHeight);
 
-  // 1. Génération du circuit en boucle fermée
-  newPath();
+  // 1. Initialisation du premier niveau
+  loadLevel(currentLevelIndex);
 
-  // 2. Initialisation des contrôles UI
+  // 2. Liaison des contrôles UI
   bindUIControls();
 
-  // 3. Création des véhicules initiaux sur la piste
-  syncVehicleCount(targetVehicleCount);
-
-  // 4. Création d'un serpent initial sur la piste
-  let startPt = path.points[0];
-  let initialSnake = new Snake(startPt.x, startPt.y, 14, 14, '#2ecc71', snakeSpeed);
-  initialSnake.setWeights(followPathWeight, separateWeight);
-  snakes.push(initialSnake);
+  // 3. Grille de départ : 4 motos individuelles et 1 écurie en aspiration
+  spawnInitialRacers();
 }
 
 function draw() {
-  background(20, 24, 32);
+  let level = RACING_LEVELS[currentLevelIndex];
 
-  // 1. Rendu stylisé du circuit (asphalte, vibreurs, ligne centrale)
-  renderStyledPath(path);
+  // 1. Arrière-plan du circuit (paddock, herbe, zones de dégagement)
+  drawTrackEnvironment(level);
 
-  // 2. Liste combinée pour la séparation mutuelle
-  // Récupération de tous les anneaux de tous les serpents
-  let allSnakeSegments = [];
-  for (let s of snakes) {
-    allSnakeSegments.push(...s.getSegments());
+  // 2. Rendu de la piste de course asphaltée avec vibreurs et ligne de départ
+  drawRacetrack(path, level);
+
+  // 3. Regroupement de toutes les motos pour la séparation mutuelle
+  let allBikes = [...motos];
+  for (let sq of squads) {
+    allBikes.push(...sq.getBikes());
   }
+  let allObstacles = [...vehicles, ...allBikes];
 
-  // 3. Mise à jour et affichage des véhicules ordinaires
-  // Les véhicules évitent les autres véhicules ET les anneaux des serpents
-  let obstaclesForVehicles = [...vehicles, ...allSnakeSegments];
+  // 4. Mise à jour des voitures de sécurité / pace cars
   for (let i = vehicles.length - 1; i >= 0; i--) {
     let v = vehicles[i];
-    v.applyBehaviors(obstaclesForVehicles, path);
+    v.applyBehaviors(allObstacles, path);
     v.run();
   }
 
-  // 4. Mise à jour et affichage des serpents
-  // Chaque serpent évite les véhicules et les autres serpents
-  for (let s of snakes) {
-    s.setWeights(followPathWeight, separateWeight);
-    s.setSpeed(snakeSpeed);
-
-    // Les entités à éviter sont les véhicules du circuit + les segments des AUTRES serpents
-    let obstaclesForThisSnake = [
-      ...vehicles,
-      ...allSnakeSegments.filter((seg) => !s.anneaux.includes(seg))
-    ];
-
-    s.applyBehaviors(obstaclesForThisSnake, path);
-    s.run(debug);
+  // 5. Mise à jour et pilotage des motos individuelles
+  for (let m of motos) {
+    m.followPathWeight = followPathWeight;
+    m.separateWeight = separateWeight;
+    // La moto évite tous les autres bolides sauf elle-même
+    let otherEntities = allObstacles.filter((b) => b !== m);
+    m.applyBehaviors(otherEntities, path, particles);
+    m.update();
+    m.render(debug);
   }
 
-  // 5. Affichage d'informations de débogage supplémentaires
+  // 6. Mise à jour des écuries en aspiration (MotoSquad)
+  for (let sq of squads) {
+    sq.setWeights(followPathWeight, separateWeight);
+    let otherEntities = allObstacles.filter((b) => !sq.getBikes().includes(b));
+    sq.applyBehaviors(otherEntities, path, particles);
+    sq.render(debug);
+  }
+
+  // 7. Particules d'échappement et nitro
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.update();
+    p.render();
+    if (p.isDead()) {
+      particles.splice(i, 1);
+    }
+  }
+
+  // 8. Télémétrie et diagnostics en mode debug
   if (debug) {
-    drawDebugOverlay();
+    drawDebugOverlay(allBikes.length);
   }
 }
 
 /**
- * Génère un circuit fluide et intéressant (forme fermée organique avec 28-32 segments)
+ * Charge un niveau donné
  */
-function newPath() {
-  path = new Path();
-  path.radius = 24;
+function loadLevel(index) {
+  currentLevelIndex = (index + RACING_LEVELS.length) % RACING_LEVELS.length;
+  let level = RACING_LEVELS[currentLevelIndex];
+  path = level.buildPath(width, height);
 
-  let nbSegments = 30;
-  let angleStep = TWO_PI / nbSegments;
-  let centerX = width / 2;
-  let centerY = height / 2;
-  let minDim = min(width, height);
-  let radiusBase = minDim * 0.36;
+  // Repositionne les motos existantes sur le nouveau tracé
+  repositionRacersOnPath();
 
-  for (let i = 0; i < nbSegments; i++) {
-    let angle = i * angleStep;
-    // Modulation harmonique pour donner des virages serrés et de longues lignes droites
-    let variation = sin(angle * 3) * (minDim * 0.08) + cos(angle * 2) * (minDim * 0.05);
-    let r = radiusBase + variation;
-    let x = centerX + cos(angle) * r;
-    let y = centerY + sin(angle) * r;
-    path.addPoint(x, y);
+  if (selectLevel) {
+    selectLevel.value = currentLevelIndex;
   }
 }
 
 /**
- * Rendu esthétique de la piste (asphalte foncé, bordures / vibreurs, ligne médiane en pointillés)
+ * Repositionne les pilotes sur le tracé actif
  */
-function renderStyledPath(p) {
+function repositionRacersOnPath() {
+  if (!path || path.points.length === 0) return;
+  let step = Math.floor(path.points.length / Math.max(1, motos.length + squads.length));
+
+  for (let i = 0; i < motos.length; i++) {
+    let pt = path.points[(i * step) % path.points.length];
+    motos[i].pos.set(pt.x + random(-10, 10), pt.y + random(-10, 10));
+    motos[i].vel.set(motos[i].maxSpeed, 0);
+  }
+}
+
+/**
+ * Crée les pilotes initiaux de la grille de départ
+ */
+function spawnInitialRacers() {
+  motos = [];
+  squads = [];
+  vehicles = [];
+  particles = [];
+
+  // Création de 4 motos de tête
+  for (let i = 0; i < 4; i++) {
+    let pt = path.points[(i * 3) % path.points.length];
+    let m = new Moto(pt.x, pt.y, motoBaseSpeed + random(-0.3, 0.4));
+    motos.push(m);
+  }
+
+  // Création d'une écurie en aspiration (3 motos)
+  let squadPt = path.points[path.points.length - 4];
+  let squad = new MotoSquad(squadPt.x, squadPt.y, 3, '#e74c3c', motoBaseSpeed);
+  squads.push(squad);
+
+  // Voiture de sécurité
+  for (let i = 0; i < paceCarCount; i++) {
+    let vPt = path.points[(i * 6 + 10) % path.points.length];
+    let v = new Vehicle(vPt.x, vPt.y, 3.2, 0.3);
+    v.couleur = '#ffffff';
+    v.r = 12;
+    vehicles.push(v);
+  }
+}
+
+/**
+ * Ajoute une nouvelle moto de course
+ * Déclenché par la touche "'" (apostrophe) ou le bouton UI
+ */
+function addMoto(x, y) {
+  let posX = x !== undefined ? x : mouseX;
+  let posY = y !== undefined ? y : mouseY;
+
+  // Si position hors champ ou sur les contrôles
+  if (posX <= 10 || posX >= width - 10 || posY <= 60 || posY >= height - 10) {
+    let randPt = path.points[Math.floor(random(path.points.length))];
+    posX = randPt.x + random(-12, 12);
+    posY = randPt.y + random(-12, 12);
+  }
+
+  let m = new Moto(posX, posY, motoBaseSpeed + random(-0.4, 0.5));
+  m.followPathWeight = followPathWeight;
+  m.separateWeight = separateWeight;
+  motos.push(m);
+  return m;
+}
+
+/**
+ * Ajoute une écurie de 3 motos en formation d'aspiration
+ */
+function addMotoSquad(x, y) {
+  let posX = x !== undefined ? x : mouseX;
+  let posY = y !== undefined ? y : mouseY;
+
+  if (posX <= 10 || posX >= width - 10 || posY <= 60 || posY >= height - 10) {
+    let randPt = path.points[0];
+    posX = randPt.x;
+    posY = randPt.y;
+  }
+
+  let squad = new MotoSquad(posX, posY, 3, null, motoBaseSpeed);
+  squad.setWeights(followPathWeight, separateWeight);
+  squads.push(squad);
+  return squad;
+}
+
+/**
+ * Déclenche le Nitro pour toutes les motos
+ */
+function triggerGlobalNitro() {
+  for (let m of motos) m.triggerNitro(90);
+  for (let sq of squads) sq.triggerNitro(90);
+}
+
+/**
+ * Arrière-plan du circuit adapté au niveau
+ */
+function drawTrackEnvironment(level) {
+  if (level.id === 3) {
+    // Ambiance urbaine nocturne : bitume bleu-nuit, lumières citadines
+    background(10, 13, 20);
+    // Légers halos d'éclairage urbain
+    noStroke();
+    fill(0, 180, 255, 6);
+    circle(width * 0.25, height * 0.3, 400);
+    circle(width * 0.75, height * 0.7, 450);
+  } else if (level.id === 4) {
+    // Ambiance technologique futuriste
+    background(14, 16, 24);
+  } else {
+    // Ambiance Grand Prix classique : pelouse verte avec relief
+    background(24, 38, 26);
+    // Bandes de pelouse tondue
+    noStroke();
+    fill(28, 44, 30);
+    for (let y = 0; y < height; y += 40) {
+      rect(0, y, width, 20);
+    }
+  }
+}
+
+/**
+ * Dessin réaliste du circuit de course
+ */
+function drawRacetrack(p, level) {
   if (!p || p.points.length < 2) return;
 
   push();
   strokeJoin(ROUND);
   strokeCap(ROUND);
 
-  // 1. Bordure extérieure / Vibreurs (rouge et blanc alterné ou liseré cyan)
+  // 1. Zone de dégagement extérieure / gravier
   noFill();
-  stroke(40, 50, 68);
-  strokeWeight(p.radius * 2 + 10);
+  stroke(55, 50, 40, 180);
+  strokeWeight(p.radius * 2 + 18);
   beginShape();
   for (let pt of p.points) vertex(pt.x, pt.y);
   endShape(CLOSE);
 
-  // 2. Asphalte de la route
-  stroke(28, 33, 44);
+  // 2. Vibreurs bicolores sur les bords (rouge & blanc ou cyan & vert)
+  let curbCol1 = level.curbColors[0];
+  let curbCol2 = level.curbColors[1];
+  stroke(curbCol1);
+  strokeWeight(p.radius * 2 + 8);
+  beginShape();
+  for (let pt of p.points) vertex(pt.x, pt.y);
+  endShape(CLOSE);
+
+  // 3. Asphalte de course
+  let [r, g, b] = level.asphaltColor;
+  stroke(r, g, b);
   strokeWeight(p.radius * 2);
   beginShape();
   for (let pt of p.points) vertex(pt.x, pt.y);
   endShape(CLOSE);
 
-  // 3. Ligne médiane discrète
-  stroke(100, 130, 170, 70);
-  strokeWeight(1.5);
+  // 4. Ligne médiane blanche discontinue (marquage de voie)
+  stroke(220, 225, 235, 110);
+  strokeWeight(1.8);
   beginShape();
   for (let pt of p.points) vertex(pt.x, pt.y);
   endShape(CLOSE);
 
-  // Si debug, afficher les points de contrôle
-  if (debug) {
-    stroke(255, 100, 100, 120);
-    strokeWeight(1);
-    for (let pt of p.points) {
-      fill(255, 150, 0);
-      noStroke();
-      circle(pt.x, pt.y, 6);
-    }
-  }
+  // 5. Ligne de départ / arrivée avec damier à la position du premier segment
+  drawStartFinishLine(p.points[0], p.points[1], p.radius);
 
   pop();
 }
 
 /**
- * Crée un nouveau véhicule ordinaire sur la piste
+ * Dessine la ligne de départ / arrivée avec motif en damier 🏁
  */
-function newVehicle(x, y) {
-  let ms = random(2.5, 4.5);
-  let mf = 0.35;
-  let v = new Vehicle(x, y, ms, mf);
-  v.r = 10;
-  v.couleur = random(['#3498db', '#9b59b6', '#e74c3c', '#f1c40f', '#e67e22']);
-  v.followPathWeight = 2.0;
-  v.separateWeight = 2.0;
-  vehicles.push(v);
-  return v;
-}
+function drawStartFinishLine(p1, p2, trackRadius) {
+  if (!p1 || !p2) return;
+  push();
+  let dir = p5.Vector.sub(p2, p1).normalize();
+  let normal = createVector(-dir.y, dir.x); // Perpendiculaire à la piste
 
-/**
- * Ajuste la population de véhicules
- */
-function syncVehicleCount(targetCount) {
-  while (vehicles.length < targetCount) {
-    let randPt = path.points[Math.floor(random(path.points.length))];
-    let offset = p5.Vector.random2D().mult(random(path.radius * 0.8));
-    newVehicle(randPt.x + offset.x, randPt.y + offset.y);
-  }
-  while (vehicles.length > targetCount) {
-    vehicles.pop();
-  }
-}
+  let leftPt = p5.Vector.add(p1, p5.Vector.mult(normal, trackRadius));
+  let rightPt = p5.Vector.sub(p1, p5.Vector.mult(normal, trackRadius));
 
-/**
- * Crée un nouveau serpent complet à la position spécifiée
- */
-function addSnake(x, y) {
-  let posX = x !== undefined ? x : mouseX;
-  let posY = y !== undefined ? y : mouseY;
-
-  // Si position hors champ, utiliser un point du circuit
-  if (posX <= 0 || posX >= width || posY <= 0 || posY >= height) {
-    let pt = path.points[Math.floor(random(path.points.length))];
-    posX = pt.x;
-    posY = pt.y;
+  // Damier
+  let steps = 8;
+  for (let i = 0; i < steps; i++) {
+    let t1 = i / steps;
+    let t2 = (i + 1) / steps;
+    let ptA = p5.Vector.lerp(leftPt, rightPt, t1);
+    let ptB = p5.Vector.lerp(leftPt, rightPt, t2);
+    stroke(i % 2 === 0 ? 255 : 20);
+    strokeWeight(6);
+    line(ptA.x, ptA.y, ptB.x, ptB.y);
   }
 
-  let nbAnneaux = Math.floor(random(10, 16));
-  let taille = random(12, 16);
-  let snake = new Snake(posX, posY, nbAnneaux, taille, null, snakeSpeed);
-  snake.setWeights(followPathWeight, separateWeight);
-  snakes.push(snake);
-  return snake;
+  // Panneau START / FINISH
+  noStroke();
+  fill(255, 215, 0);
+  textSize(9);
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  text('🏁 START', leftPt.x, leftPt.y - 12);
+  pop();
 }
 
 /**
  * Liaison des curseurs et boutons HTML
  */
 function bindUIControls() {
+  selectLevel = document.getElementById('select-level');
   sliderFollow = document.getElementById('slider-follow');
   valFollow = document.getElementById('val-follow');
   sliderSeparate = document.getElementById('slider-separate');
   valSeparate = document.getElementById('val-separate');
   sliderSpeed = document.getElementById('slider-speed');
   valSpeed = document.getElementById('val-speed');
-  sliderVehicles = document.getElementById('slider-vehicles');
-  valVehicles = document.getElementById('val-vehicles');
 
-  btnAddSnake = document.getElementById('btn-add-snake');
+  btnAddMoto = document.getElementById('btn-add-moto');
+  btnAddSquad = document.getElementById('btn-add-squad');
+  btnNitro = document.getElementById('btn-nitro');
   btnDebug = document.getElementById('btn-debug');
-  btnNewPath = document.getElementById('btn-new-path');
-  btnClearSnakes = document.getElementById('btn-clear-snakes');
+  btnNextLevel = document.getElementById('btn-next-level');
+  btnClear = document.getElementById('btn-clear');
+
+  if (selectLevel) {
+    selectLevel.addEventListener('change', () => {
+      loadLevel(parseInt(selectLevel.value, 10));
+    });
+  }
 
   if (sliderFollow) {
     sliderFollow.addEventListener('input', () => {
@@ -249,45 +365,46 @@ function bindUIControls() {
 
   if (sliderSpeed) {
     sliderSpeed.addEventListener('input', () => {
-      snakeSpeed = parseFloat(sliderSpeed.value);
-      if (valSpeed) valSpeed.textContent = snakeSpeed.toFixed(1);
-      for (let s of snakes) s.setSpeed(snakeSpeed);
+      motoBaseSpeed = parseFloat(sliderSpeed.value);
+      if (valSpeed) valSpeed.textContent = motoBaseSpeed.toFixed(1);
+      for (let m of motos) m.originalMaxSpeed = motoBaseSpeed;
+      for (let sq of squads) sq.setSpeed(motoBaseSpeed);
     });
   }
 
-  if (sliderVehicles) {
-    sliderVehicles.addEventListener('input', () => {
-      targetVehicleCount = parseInt(sliderVehicles.value, 10);
-      if (valVehicles) valVehicles.textContent = targetVehicleCount;
-      syncVehicleCount(targetVehicleCount);
-    });
+  if (btnAddMoto) {
+    btnAddMoto.addEventListener('click', () => addMoto(mouseX, mouseY));
   }
 
-  if (btnAddSnake) {
-    btnAddSnake.addEventListener('click', () => {
-      addSnake(mouseX, mouseY);
-    });
+  if (btnAddSquad) {
+    btnAddSquad.addEventListener('click', () => addMotoSquad(mouseX, mouseY));
+  }
+
+  if (btnNitro) {
+    btnNitro.addEventListener('click', triggerGlobalNitro);
   }
 
   if (btnDebug) {
     btnDebug.addEventListener('click', toggleDebug);
   }
 
-  if (btnNewPath) {
-    btnNewPath.addEventListener('click', () => {
-      newPath();
+  if (btnNextLevel) {
+    btnNextLevel.addEventListener('click', () => {
+      loadLevel(currentLevelIndex + 1);
     });
   }
 
-  if (btnClearSnakes) {
-    btnClearSnakes.addEventListener('click', () => {
-      snakes = [];
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      motos = [];
+      squads = [];
+      particles = [];
     });
   }
 }
 
 /**
- * Bascule du mode debug (touche D ou bouton UI)
+ * Bascule du mode debug (touche D)
  */
 function toggleDebug() {
   debug = !debug;
@@ -299,61 +416,59 @@ function toggleDebug() {
 }
 
 /**
- * Affichage des métriques et diagnostics en mode debug
+ * Overlay de télémétrie en mode debug
  */
-function drawDebugOverlay() {
+function drawDebugOverlay(totalBikes) {
   push();
   noStroke();
-  fill(255);
-  textSize(13);
-  textAlign(LEFT, TOP);
-
-  let startY = 80;
-  fill(0, 0, 0, 160);
-  rect(12, startY - 6, 260, 110, 8);
+  fill(0, 0, 0, 180);
+  rect(12, 70, 275, 130, 8);
 
   fill('#ebcb8b');
-  text(`[MODE DEBUG ACTIF]`, 20, startY);
+  textSize(12);
+  textStyle(BOLD);
+  textAlign(LEFT, TOP);
+  text(`[TÉLÉMÉTRIE GP - MODE DEBUG]`, 20, 78);
+
+  let lvl = RACING_LEVELS[currentLevelIndex];
+  textStyle(NORMAL);
   fill('#eceff4');
-  text(`Serpents actifs : ${snakes.length}`, 20, startY + 20);
-  text(`Total anneaux (sub-vehicles) : ${snakes.reduce((acc, s) => acc + s.anneaux.length, 0)}`, 20, startY + 38);
-  text(`Véhicules circuit : ${vehicles.length}`, 20, startY + 56);
-  text(`Poids Follow / Separate : ${followPathWeight.toFixed(1)} / ${separateWeight.toFixed(1)}`, 20, startY + 74);
+  text(`Circuit : ${lvl.name}`, 20, 96);
+  text(`Difficulté : ${lvl.difficulty}`, 20, 112);
+  text(`Motos en piste : ${totalBikes}`, 20, 128);
+  text(`Pace cars : ${vehicles.length}`, 20, 144);
+  text(`Poids Trajectoire / Séparation : ${followPathWeight.toFixed(1)} / ${separateWeight.toFixed(1)}`, 20, 160);
+  text(`Vitesse de base : ${(motoBaseSpeed * 30).toFixed(0)} km/h`, 20, 176);
   pop();
 }
 
 /**
  * Gestion du clavier
- * Exigence : la touche "'" sert à créer de nouveaux serpents
+ * Touche "'" (apostrophe / quote) -> Ajoute une nouvelle moto de course
  */
 function keyPressed(event) {
-  // Touche ' (apostrophe / quote) pour créer un nouveau Snake
   if (key === "'" || (event && (event.key === "'" || event.code === 'Quote'))) {
-    addSnake(mouseX, mouseY);
+    addMoto(mouseX, mouseY);
   } else if (key === 'd' || key === 'D') {
     toggleDebug();
-  } else if (key === 'w' || key === 'W') {
-    // Créer un serpent libre (SnakeWander)
-    let sw = new SnakeWander(mouseX, mouseY, 12, 14, '#f39c12');
-    sw.setWeights(followPathWeight, separateWeight);
-    snakes.push(sw);
-  } else if (key === 'v' || key === 'V') {
-    newVehicle(mouseX, mouseY);
+  } else if (key === 'n' || key === 'N') {
+    loadLevel(currentLevelIndex + 1);
+  } else if (key === 's' || key === 'S') {
+    addMotoSquad(mouseX, mouseY);
+  } else if (key === ' ' || key === 'b' || key === 'B') {
+    triggerGlobalNitro();
   }
 }
 
-/**
- * Clic ou glisser de souris pour générer des véhicules
- */
 function mouseDragged() {
   const controlsEl = document.getElementById('controls');
-  if (controlsEl && mouseY < controlsEl.offsetHeight + 20) return;
-  if (frameCount % 4 === 0) {
-    newVehicle(mouseX, mouseY);
+  if (controlsEl && mouseY < controlsEl.offsetHeight + 15) return;
+  if (frameCount % 6 === 0) {
+    addMoto(mouseX, mouseY);
   }
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  newPath();
+  loadLevel(currentLevelIndex);
 }

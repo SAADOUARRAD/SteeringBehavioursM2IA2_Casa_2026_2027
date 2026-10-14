@@ -3,67 +3,74 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>5-3 Path Following Complex — Snakes & Véhicules</title>
+    <title>5-3 Path Following Complex — Grand Prix Moto & Circuits Multi-Niveaux</title>
     <link rel="stylesheet" type="text/css" href="style.css" />
 
     <!-- Librairies P5.js -->
     <script src="libraries/p5.min.js"></script>
     <script src="libraries/p5.sound.min.js"></script>
 
-    <!-- Code de base fourni (non modifié) -->
+    <!-- Code de base fourni (100% intact) -->
     <script src="path.js"></script>
     <script src="vehicle.js"></script>
 
-    <!-- Entités Snake développées -->
-    <script src="SnakeSegment.js"></script>
-    <script src="Snake.js"></script>
-    <script src="SnakeWander.js"></script>
+    <!-- Niveaux de circuit & Entités Moto -->
+    <script src="levels.js"></script>
+    <script src="ExhaustParticle.js"></script>
+    <script src="Moto.js"></script>
+    <script src="MotoSquad.js"></script>
 
     <!-- Sketch principal -->
     <script src="sketch.js"></script>
   </head>
   <body>
     <header id="controls">
-      <!-- Poids Suivi de Chemin -->
+      <!-- Sélecteur de Niveau -->
       <div class="control-group">
-        <label for="slider-follow">Suivi Chemin :</label>
-        <input id="slider-follow" type="range" min="0" max="6" step="0.1" value="2.0" />
-        <output id="val-follow">2.0</output>
+        <label for="select-level">🏁 Niveau :</label>
+        <select id="select-level">
+          <option value="0">Niv. 1 — Speedway Débutant (Daytona)</option>
+          <option value="1">Niv. 2 — Grand Prix Pro (Monza)</option>
+          <option value="2">Niv. 3 — Circuit Urbain Nocturne (Monaco)</option>
+          <option value="3">Niv. 4 — Circuit Double-Boucle (Figure 8)</option>
+        </select>
       </div>
 
-      <!-- Poids Séparation -->
+      <!-- Poids Suivi de Trajectoire -->
+      <div class="control-group">
+        <label for="slider-follow">Trajectoire :</label>
+        <input id="slider-follow" type="range" min="0" max="6" step="0.1" value="2.2" />
+        <output id="val-follow">2.2</output>
+      </div>
+
+      <!-- Poids Séparation / Distance de Sécurité -->
       <div class="control-group">
         <label for="slider-separate">Séparation :</label>
-        <input id="slider-separate" type="range" min="0" max="8" step="0.1" value="2.5" />
-        <output id="val-separate">2.5</output>
+        <input id="slider-separate" type="range" min="0" max="8" step="0.1" value="2.8" />
+        <output id="val-separate">2.8</output>
       </div>
 
-      <!-- Vitesse des serpents -->
+      <!-- Vitesse des Motos -->
       <div class="control-group">
-        <label for="slider-speed">Vitesse Snake :</label>
-        <input id="slider-speed" type="range" min="1" max="10" step="0.5" value="3.5" />
-        <output id="val-speed">3.5</output>
+        <label for="slider-speed">Vitesse :</label>
+        <input id="slider-speed" type="range" min="1" max="10" step="0.5" value="4.2" />
+        <output id="val-speed">4.2</output>
       </div>
 
-      <!-- Nombre de véhicules sur piste -->
+      <!-- Actions Rapides -->
       <div class="control-group">
-        <label for="slider-vehicles">Véhicules :</label>
-        <input id="slider-vehicles" type="range" min="0" max="40" step="1" value="10" />
-        <output id="val-vehicles">10</output>
-      </div>
-
-      <!-- Boutons d'action -->
-      <div class="control-group">
-        <button id="btn-add-snake" class="primary" title="Touche ' (apostrophe)">+ Snake [ ' ]</button>
+        <button id="btn-add-moto" class="primary" title="Touche ' (apostrophe)">+ Moto [ ' ]</button>
+        <button id="btn-add-squad" title="Touche S">+ Écurie [S]</button>
+        <button id="btn-nitro" class="nitro-btn" title="Touche Espace / B">⚡ Nitro Boost</button>
+        <button id="btn-next-level" title="Touche N">Niv. Suivant [N]</button>
         <button id="btn-debug" title="Touche D">Debug [D] : OFF</button>
-        <button id="btn-new-path" title="Nouveau circuit aléatoire">🔄 Circuit</button>
-        <button id="btn-clear-snakes">Effacer Snakes</button>
+        <button id="btn-clear">Effacer Motos</button>
       </div>
     </header>
 
     <div class="hud-info">
-      ⌨ <b>Touche ' (apostrophe)</b> : Créer un nouveau Snake à la souris | <b>Touche D</b> : Debug<br/>
-      🖱 <b>Clic / Glisser</b> : Ajouter des véhicules | <b>Touche W</b> : Créer un Snake libre (Wander)
+      🏍️ <b>Touche ' (apostrophe)</b> : Créer une moto GP | <b>Touche S</b> : Créer une écurie en aspiration<br/>
+      ⚡ <b>Touche Espace / B</b> : Nitro Boost | <b>Touche N</b> : Changer de circuit | <b>Touche D</b> : Debug
     </div>
   </body>
 </html>

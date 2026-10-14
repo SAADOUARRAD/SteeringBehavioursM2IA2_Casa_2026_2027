@@ -1,20 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>5-3 Path Following Complex — Snakes & Véhicules</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
 
-    <title>Sketch</title>
-
-    <link rel="stylesheet" type="text/css" href="style.css">
-
+    <!-- Librairies P5.js -->
     <script src="libraries/p5.min.js"></script>
     <script src="libraries/p5.sound.min.js"></script>
+
+    <!-- Code de base fourni (non modifié) -->
     <script src="path.js"></script>
     <script src="vehicle.js"></script>
+
+    <!-- Entités Snake développées -->
+    <script src="SnakeSegment.js"></script>
+    <script src="Snake.js"></script>
+    <script src="SnakeWander.js"></script>
+
+    <!-- Sketch principal -->
     <script src="sketch.js"></script>
   </head>
   <body>
-    <!-- Pas besoin de déclarer un canvas pour dessiner en P5.js -->
+    <header id="controls">
+      <!-- Poids Suivi de Chemin -->
+      <div class="control-group">
+        <label for="slider-follow">Suivi Chemin :</label>
+        <input id="slider-follow" type="range" min="0" max="6" step="0.1" value="2.0" />
+        <output id="val-follow">2.0</output>
+      </div>
+
+      <!-- Poids Séparation -->
+      <div class="control-group">
+        <label for="slider-separate">Séparation :</label>
+        <input id="slider-separate" type="range" min="0" max="8" step="0.1" value="2.5" />
+        <output id="val-separate">2.5</output>
+      </div>
+
+      <!-- Vitesse des serpents -->
+      <div class="control-group">
+        <label for="slider-speed">Vitesse Snake :</label>
+        <input id="slider-speed" type="range" min="1" max="10" step="0.5" value="3.5" />
+        <output id="val-speed">3.5</output>
+      </div>
+
+      <!-- Nombre de véhicules sur piste -->
+      <div class="control-group">
+        <label for="slider-vehicles">Véhicules :</label>
+        <input id="slider-vehicles" type="range" min="0" max="40" step="1" value="10" />
+        <output id="val-vehicles">10</output>
+      </div>
+
+      <!-- Boutons d'action -->
+      <div class="control-group">
+        <button id="btn-add-snake" class="primary" title="Touche ' (apostrophe)">+ Snake [ ' ]</button>
+        <button id="btn-debug" title="Touche D">Debug [D] : OFF</button>
+        <button id="btn-new-path" title="Nouveau circuit aléatoire">🔄 Circuit</button>
+        <button id="btn-clear-snakes">Effacer Snakes</button>
+      </div>
+    </header>
+
+    <div class="hud-info">
+      ⌨ <b>Touche ' (apostrophe)</b> : Créer un nouveau Snake à la souris | <b>Touche D</b> : Debug<br/>
+      🖱 <b>Clic / Glisser</b> : Ajouter des véhicules | <b>Touche W</b> : Créer un Snake libre (Wander)
+    </div>
   </body>
 </html>

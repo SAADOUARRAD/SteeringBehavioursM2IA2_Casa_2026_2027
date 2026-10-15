@@ -53,7 +53,7 @@ class Vehicle {
     let seekForce = this.arrive(target);
     let avoidForce = this.avoid(obstacles);
     let separateForce = this.separate(vehicules);
-    let boudariesForce = this.boundaries();
+    let boudariesForce = this.boundaries(0, 0, width, height, 25);
 
     seekForce.mult(0.2);
     avoidForce.mult(3);
@@ -62,8 +62,8 @@ class Vehicle {
 
     this.applyForce(seekForce);
     this.applyForce(avoidForce);
-    //this.applyForce(separateForce);
-    //this.applyForce(boudariesForce);
+    this.applyForce(separateForce);
+    this.applyForce(boudariesForce);
   }
 
   avoid(obstacles) {
@@ -121,13 +121,13 @@ class Vehicle {
     let vehiculeLePlusProche = this.getVehiculeLePlusProche(vehicules)
     let distance4 = 1000000;
 
-    /*
-    if (vehiculeLePlusProche !== undefined) {
+    
+    //if (vehiculeLePlusProche !== undefined) {
       // on calcule la distance4 entre le vaisseau et
       // ce vehicule
-      distance4 = this.pos.dist(vehiculeLePlusProche.pos);
-    }
-*/
+      //distance4 = this.pos.dist(vehiculeLePlusProche.pos);
+    //}
+
     let distance = obstacleLePlusProche.pos.dist(pointAuBoutDeAhead);
     let distance2 = obstacleLePlusProche.pos.dist(pointAuBoutDeAhead2);
     let distance3 = obstacleLePlusProche.pos.dist(this.pos);

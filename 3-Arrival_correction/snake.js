@@ -25,6 +25,11 @@ class Snake extends Vehicle {
         this.head.applyForce(force);
         this.head.update();
 
+        // second comportement
+        let forceWander = this.head.wander();
+        this.head.applyForce(forceWander);
+        this.head.update();
+
         // Chaque anneau suit l'anneau précédent
         for (let i = 1; i < this.anneaux.length; i++) {
             let cible = this.anneaux[i - 1].pos;

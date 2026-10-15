@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>9b — Neuroévolution Racing & Réseau de Neurones Multicouche Dynamique</title>
+    <title>9b — AI Vehicle Training & Neuroévolution Racing</title>
 
     <link rel="stylesheet" href="css/style.css">
 
@@ -23,167 +23,217 @@
 </head>
 
 <body>
-    <!-- Panneau de Contrôle Haute Technologie -->
+    <!-- Panneau de Contrôle Principal Haute Technologie -->
     <aside id="ui" class="cyber-panel">
-        <div class="panel-header">
-            <h2>🏎️ Neuroévolution 9b</h2>
-            <div id="topologyBadge" class="badge">[6 → 15 → 8 → 2]</div>
-        </div>
-
-        <div class="panel-content">
-            <!-- Onglet 1 : Véhicules & Vitesse -->
-            <fieldset class="control-section">
-                <legend>⚡ Vitesse & Dynamique</legend>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="speedSlider">Vitesse Max :</label>
-                        <span id="speedVal" class="val">8</span>
-                    </div>
-                    <input type="range" id="speedSlider" min="2" max="25" value="8" step="0.5">
+        <header class="panel-header">
+            <div class="header-title">
+                <span class="icon">🏎️</span>
+                <div>
+                    <h1>AI VEHICLE TRAINING</h1>
+                    <span class="sub-header">Steering Behaviours & Neuro-Évolution</span>
                 </div>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="forceSlider">Braquage / Force :</label>
-                        <span id="forceVal" class="val">0.55</span>
-                    </div>
-                    <input type="range" id="forceSlider" min="0.1" max="1.5" value="0.55" step="0.05">
-                </div>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="simSpeedSelect">Vitesse Simulation :</label>
-                    </div>
-                    <select id="simSpeedSelect">
-                        <option value="1" selected>1x (Temps Réel)</option>
-                        <option value="2">2x (Accéléré)</option>
-                        <option value="5">5x (Rapide)</option>
-                        <option value="10">10x (Ultra Rapide)</option>
-                        <option value="20">20x (Mode Éclair)</option>
-                    </select>
-                </div>
-            </fieldset>
-
-            <!-- Onglet 2 : Capteurs & Rayons -->
-            <fieldset class="control-section">
-                <legend>📡 Capteurs & Rayons</legend>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="raysSlider">Nombre de Rayons :</label>
-                        <span id="raysVal" class="val highlight">5</span>
-                    </div>
-                    <input type="range" id="raysSlider" min="3" max="15" value="5" step="1">
-                </div>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="sightSlider">Portée Laser :</label>
-                        <span id="sightVal" class="val">160px</span>
-                    </div>
-                    <input type="range" id="sightSlider" min="70" max="350" value="160" step="10">
-                </div>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="fovSlider">Champ de Vision (FOV) :</label>
-                        <span id="fovVal" class="val">135°</span>
-                    </div>
-                    <input type="range" id="fovSlider" min="45" max="200" value="135" step="5">
-                </div>
-            </fieldset>
-
-            <!-- Onglet 3 : Topologie du Réseau de Neurones -->
-            <fieldset class="control-section">
-                <legend>🧠 Cerveau & Topologie IA</legend>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="layersCountSlider">Couches Cachées :</label>
-                        <span id="layersCountVal" class="val">2</span>
-                    </div>
-                    <input type="range" id="layersCountSlider" min="1" max="3" value="2" step="1">
-                </div>
-
-                <div class="control-group checkbox-row">
-                    <input type="checkbox" id="autoNeuronsCheck" checked>
-                    <label for="autoNeuronsCheck" class="inline-label">Neurones variables selon les rayons</label>
-                </div>
-
-                <div id="autoNeuronsGroup" class="control-group">
-                    <div class="label-row">
-                        <label for="ratioNeuronsSlider">Ratio Neurones / Rayons :</label>
-                        <span id="ratioNeuronsVal" class="val">2.0x</span>
-                    </div>
-                    <input type="range" id="ratioNeuronsSlider" min="1.0" max="4.0" value="2.0" step="0.2">
-                    <small class="tip">Le nombre de neurones s'ajuste automatiquement selon les rayons.</small>
-                </div>
-
-                <div id="manualNeuronsGroup" class="control-group" style="display: none;">
-                    <div class="label-row">
-                        <label for="layer1Slider">Couche 1 :</label>
-                        <span id="layer1SliderVal" class="val">16</span>
-                    </div>
-                    <input type="range" id="layer1Slider" min="4" max="32" value="16" step="1">
-                    <div class="label-row">
-                        <label for="layer2Slider">Couche 2 :</label>
-                        <span id="layer2SliderVal" class="val">10</span>
-                    </div>
-                    <input type="range" id="layer2Slider" min="4" max="24" value="10" step="1">
-                    <div class="label-row">
-                        <label for="layer3Slider">Couche 3 :</label>
-                        <span id="layer3SliderVal" class="val">6</span>
-                    </div>
-                    <input type="range" id="layer3Slider" min="2" max="16" value="6" step="1">
-                </div>
-            </fieldset>
-
-            <!-- Onglet 4 : Algorithme Génétique -->
-            <fieldset class="control-section">
-                <legend>🧬 Évolution & Circuit</legend>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="mutSlider">Taux de Mutation :</label>
-                        <span id="mutVal" class="val">12%</span>
-                    </div>
-                    <input type="range" id="mutSlider" min="0.01" max="0.4" value="0.12" step="0.01">
-                </div>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="popSlider">Population :</label>
-                        <span id="popVal" class="val">40</span>
-                    </div>
-                    <input type="range" id="popSlider" min="10" max="80" value="40" step="5">
-                </div>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="diffSlider">Complexité Circuit :</label>
-                        <span id="diffVal" class="val">6</span>
-                    </div>
-                    <input type="range" id="diffSlider" min="2" max="25" value="6" step="1">
-                </div>
-                <div class="control-group">
-                    <div class="label-row">
-                        <label for="widthSlider">Largeur Piste :</label>
-                        <span id="widthVal" class="val">110px</span>
-                    </div>
-                    <input type="range" id="widthSlider" min="50" max="160" value="110" step="5">
-                </div>
-            </fieldset>
-
-            <!-- Boutons d'Action Rapide -->
-            <div class="action-buttons">
-                <button id="btnNextGen" class="btn btn-primary" title="Touche G">⚡ Forcer Génération [G]</button>
-                <button id="btnTogglePause" class="btn" title="Touche Espace">⏸ Pause</button>
-                <button id="btnToggleNN" class="btn" title="Touche N">🧠 Réseau [N]</button>
-                <button id="btnToggleDebug" class="btn" title="Touche D">🛠 Debug [D]</button>
-                <button id="btnSaveModel" class="btn btn-secondary" title="Touche S">💾 Sauvegarder [S]</button>
-                <button id="btnLoadModel" class="btn btn-secondary" title="Touche L">📂 Charger [L]</button>
-                <button id="btnResetTrain" class="btn btn-danger" title="Touche R">🔄 Réinitialiser [R]</button>
             </div>
+            <!-- Badge de Topologie en temps réel -->
+            <div id="topologyBadge" class="topology-badge" title="Topologie active du réseau">
+                5 → 10 → 6 → 2
+            </div>
+        </header>
+
+        <div class="panel-body">
+            <!-- 1. VISION (Capteurs lasers) -->
+            <section class="config-card">
+                <div class="card-header">
+                    <span class="card-icon">📡</span>
+                    <h3>VISION & CAPTEURS</h3>
+                </div>
+                <div class="card-content">
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="raysSlider">Nombre de Rayons :</label>
+                            <span id="raysVal" class="value-tag primary">5</span>
+                        </div>
+                        <input type="range" id="raysSlider" min="3" max="15" value="5" step="1">
+                        <span class="input-hint">Définit le nombre d'entrées du réseau (1 rayon = 1 neurone INPUT)</span>
+                    </div>
+
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="sightSlider">Portée Laser :</label>
+                            <span id="sightVal" class="value-tag">150 px</span>
+                        </div>
+                        <input type="range" id="sightSlider" min="70" max="350" value="150" step="10">
+                    </div>
+
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="fovSlider">Champ de Vision (FOV) :</label>
+                            <span id="fovVal" class="value-tag">135°</span>
+                        </div>
+                        <input type="range" id="fovSlider" min="45" max="220" value="135" step="5">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. NETWORK (Topologie multicouche) -->
+            <section class="config-card featured">
+                <div class="card-header">
+                    <span class="card-icon">🧠</span>
+                    <h3>RÉSEAU DE NEURONES (TOPOLOGIE)</h3>
+                </div>
+                <div class="card-content">
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="hiddenLayersSlider">Nombre de Couches Cachées :</label>
+                            <span id="hiddenLayersVal" class="value-tag accent">2</span>
+                        </div>
+                        <input type="range" id="hiddenLayersSlider" min="1" max="5" value="2" step="1">
+                    </div>
+
+                    <!-- Conteneur généré dynamiquement pour chaque couche cachée (1 à 5 sliders) -->
+                    <div id="dynamicLayersContainer" class="dynamic-layers-wrapper">
+                        <!-- Généré par JavaScript en fonction du nombre de couches et de rayons -->
+                    </div>
+
+                    <!-- Affichage Prévisualisation de la topologie configurée -->
+                    <div class="topology-preview-box">
+                        <span class="preview-label">Topologie configurée :</span>
+                        <span id="pendingTopologyDisplay" class="preview-topology">5 → 10 → 6 → 2</span>
+                    </div>
+
+                    <!-- Bouton Majeur : APPLY NETWORK -->
+                    <button id="btnApplyNetwork" class="btn btn-apply" title="Reconstruit le réseau et réinitialise la population à la génération 1">
+                        ⚡ APPLY NETWORK
+                    </button>
+                </div>
+            </section>
+
+            <!-- 3. VEHICLE DYNAMICS (Vitesse & Braquage) -->
+            <section class="config-card">
+                <div class="card-header">
+                    <span class="card-icon">⚙️</span>
+                    <h3>DYNAMIQUE DU VÉHICULE</h3>
+                </div>
+                <div class="card-content">
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="speedSlider">Max Speed :</label>
+                            <span id="speedVal" class="value-tag">5.0</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="1" max="15" value="5.0" step="0.5">
+                    </div>
+
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="forceSlider">Max Force (Steering) :</label>
+                            <span id="forceVal" class="value-tag">0.50</span>
+                        </div>
+                        <input type="range" id="forceSlider" min="0.1" max="1.5" value="0.50" step="0.05">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. TRAINING & TELEMETRY (Entraînement & Télémétrie) -->
+            <section class="config-card">
+                <div class="card-header">
+                    <span class="card-icon">🧬</span>
+                    <h3>CONTRÔLE DE L'ENTRAÎNEMENT</h3>
+                </div>
+                <div class="card-content">
+                    <!-- Vitesse de simulation -->
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="simSpeedSelect">Simulation Speed :</label>
+                        </div>
+                        <select id="simSpeedSelect" class="cyber-select">
+                            <option value="0.5">0.5x (Ralenti)</option>
+                            <option value="1" selected>1x (Temps Réel)</option>
+                            <option value="2">2x (Accéléré)</option>
+                            <option value="5">5x (Rapide)</option>
+                            <option value="10">10x (Ultra Rapide)</option>
+                            <option value="20">20x (Mode Éclair)</option>
+                        </select>
+                    </div>
+
+                    <!-- Paramètres génétiques -->
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="popSlider">Population :</label>
+                            <span id="popVal" class="value-tag">30</span>
+                        </div>
+                        <input type="range" id="popSlider" min="10" max="60" value="30" step="5">
+                    </div>
+
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="mutSlider">Mutation Rate :</label>
+                            <span id="mutVal" class="value-tag">12%</span>
+                        </div>
+                        <input type="range" id="mutSlider" min="0.01" max="0.4" value="0.12" step="0.01">
+                    </div>
+
+                    <!-- Télémétrie en temps réel -->
+                    <div class="telemetry-box">
+                        <div class="telemetry-item">
+                            <span class="tel-label">Génération :</span>
+                            <span id="statGen" class="tel-value highlight">1</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="tel-label">En Vie :</span>
+                            <span id="statAlive" class="tel-value">30 / 30</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="tel-label">Best Fitness :</span>
+                            <span id="statBestFit" class="tel-value primary">0</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="tel-label">Avg Fitness :</span>
+                            <span id="statAvgFit" class="tel-value">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Boutons de Contrôle d'Entraînement -->
+                    <div class="training-btn-grid">
+                        <button id="btnStart" class="btn btn-success" title="Démarrer l'entraînement">
+                            ▶ START
+                        </button>
+                        <button id="btnPause" class="btn btn-warning" title="Mettre en pause (Touche Espace)">
+                            ⏸ PAUSE
+                        </button>
+                        <button id="btnReset" class="btn btn-danger" title="Réinitialiser l'entraînement (Touche R)">
+                            🔄 RESET
+                        </button>
+                        <button id="btnNextGen" class="btn btn-secondary" title="Forcer la génération suivante (Touche G)">
+                            ⚡ FORCE GEN
+                        </button>
+                    </div>
+
+                    <!-- Options de Visualisation & Circuit -->
+                    <div class="utility-btn-row">
+                        <button id="btnToggleNN" class="btn-sm" title="Afficher/Masquer le schéma du réseau (Touche N)">
+                            🧠 Réseau [N]
+                        </button>
+                        <button id="btnToggleDebug" class="btn-sm" title="Activer/Désactiver le mode debug (Touche D)">
+                            🛠 Debug [D]
+                        </button>
+                        <button id="btnSaveModel" class="btn-sm" title="Sauvegarder le champion en JSON (Touche S)">
+                            💾 Sauver [S]
+                        </button>
+                        <button id="btnLoadModel" class="btn-sm" title="Charger un champion (Touche L)">
+                            📂 Charger [L]
+                        </button>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <footer class="panel-footer">
-            <span class="legend-item"><span class="dot green"></span> Leader</span>
-            <span class="legend-item"><span class="dot cyan"></span> Peloton</span>
-            <span class="legend-item"><span class="dot red"></span> Danger</span>
+            <span class="legend-dot green"></span> Leader
+            <span class="legend-dot cyan"></span> Peloton
+            <span class="legend-dot red"></span> Mur / Danger
         </footer>
     </aside>
 
+    <!-- Canvas P5.js Container -->
     <div id="canvas-container"></div>
 </body>
 

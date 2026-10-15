@@ -1,10 +1,9 @@
 // Variables Globales partagées pour Neuroévolution Racing 9b
 // Architecture dynamique : rayons, couches et neurones adaptatifs
 
-var TOTAL_POP = 40;
+var TOTAL_POP = 30;
 var NUM_RAYS = 5;               // Nombre de rayons capteurs (3 à 15)
-var NB_ASSETS = NUM_RAYS + 1;   // Nombre total d'entrées du réseau (rayons + vitesse)
-var SIGHT_DIST = 160;           // Portée de détection des rayons en pixels
+var SIGHT_DIST = 150;           // Portée de détection des rayons en pixels
 var FOV = Math.PI * 0.75;       // Champ de vision angulaire (~135°)
 
 var cars = [];
@@ -16,31 +15,26 @@ var currentTiles = [];
 
 var startX = 115;
 var startY = 115;
-var generation = 0;
+var generation = 1;             // Commence à la génération 1
 var bestCar = null;
 var championModel = null;       // Meilleur cerveau immortel conservé
+var bestFitnessRecord = 0;
 var bestLapTimeRecord = null;
 var generationHistory = [];      // Historique des scores pour télémétrie
 
 // Paramètres Dynamiques de Véhicule & Vitesse
-var GAME_SPEED_LIMIT = 8;       // Vitesse max en px/frame
-var CAR_MAX_FORCE = 0.55;       // Force d'accélération et de braquage max
-var CAR_START_IMPULSE = 1.8;    // Impulsion de départ
+var GAME_SPEED_LIMIT = 5.0;     // Vitesse max en px/frame (défaut: 5.0)
+var CAR_MAX_FORCE = 0.50;       // Force d'accélération et de braquage max (défaut: 0.50)
+var CAR_START_IMPULSE = 1.2;    // Impulsion de départ
 
 // Paramètres Génétiques & Entraînement
 var MUTATION_RATE = 0.12;       // Taux de mutation gaussienne
 var MUTATION_AMOUNT = 0.15;     // Amplitude de la mutation
-var SIMULATION_SPEED = 1;       // Accélérateur temporel (1x, 2x, 5x, 10x, 20x)
+var SIMULATION_SPEED = 1;       // Accélérateur temporel (0.5x, 1x, 2x, 5x, 10x, 20x)
 var TRACK_DIFFICULTY = 6;
 var TRACK_WIDTH = 110;
 var trainingFinished = false;
 var TRAINING_PAUSED = false;
-
-// Topologie Réseau de Neurones Multicouche
-var HIDDEN_LAYERS_COUNT = 2;    // Nombre de couches cachées (1, 2 ou 3)
-var AUTO_NEURONS_PER_LAYER = true; // Si vrai, varie automatiquement selon le nombre de rayons
-var NEURON_RATIO_PER_RAY = 2.0; // Multiplicateur de neurones par rayon
-var MANUAL_LAYER_NEURONS = [16, 10, 6]; // Réglage manuel par couche si non-auto
 
 // Affichage & Debug
 var DEBUG_MODE = false;         // Mode debug unifié (touche 'd')
@@ -48,46 +42,69 @@ var SHOW_NN_VISUALIZER = true;  // Affichage du réseau de neurones en direct (t
 var FOCUS_BEST_CAR = false;     // Suivi caméra centré sur le leader (touche 'f')
 
 /**
- * Calcule la topologie complète du réseau : [inputs, ...couches_cachées, outputs]
- * Le nombre de neurones varie directement en fonction des rayons d'entrée !
- * @param {number} numRays Nombre de rayons capteurs
- * @returns {number[]} Tableau décrivant les tailles des couches [n_in, n_h1, ..., n_out]
+ * ============================================================================
+ * CONFIGURATION CENTRALE DU RÉSEAU DE NEURONES (Section 16 du cours)
+ * ============================================================================
+ * Le nombre de neurones de la couche INPUT est strictement égal au nombre de rayons.
+ * Formule : numberOfRays -> inputSize -> networkConfig -> Neural Network -> Vehicle
+ */
+var networkConfig = {
+    inputSize: NUM_RAYS,            // Toujours égal à NUM_RAYS
+    hiddenLayers: [10, 6],          // Nombre de neurones par couche cachée (ex: 2 couches: [10, 6])
+    outputSize: 2,                  // [0: braquage, 1: accélération]
+
+    /**
+     * Retourne la topologie complète sous forme de tableau [input, h1, h2..., output]
+     */
+    getTopology() {
+        return [this.inputSize, ...this.hiddenLayers, this.outputSize];
+    },
+
+    /**
+     * Formate la topologie sous forme lisible : "5 → 10 → 6 → 2"
+     */
+    formatTopology() {
+        return this.getTopology().join(' → ');
+    },
+
+    /**
+     * Suggère des tailles de couches cachées cohérentes en fonction du nombre de rayons
+     * (Section 4 du cours)
+     * Exemples :
+     *   Rayons = 5  -> [10, 6]
+     *   Rayons = 8  -> [16, 8]
+     *   Rayons = 10 -> [20, 10, 5]
+     *   Rayons = 12 -> [24, 12, 6]
+     * @param {number} rays Nombre de rayons
+     * @param {number} numLayers Nombre de couches cachées souhaité (1 à 5)
+     * @returns {number[]} Tableau des tailles de couches suggérées
+     */
+    suggestLayers(rays, numLayers = this.hiddenLayers.length) {
+        const multipliers = [2.0, 1.0, 0.5, 0.35, 0.25];
+        let suggested = [];
+        for (let l = 0; l < numLayers; l++) {
+            let mult = multipliers[l] !== undefined ? multipliers[l] : Math.max(0.2, 1.0 / (l + 1));
+            let neurons = Math.max(2, Math.round(rays * mult));
+            suggested.push(neurons);
+        }
+        return suggested;
+    }
+};
+
+/**
+ * Rétrocompatibilité : calcule la topologie à partir de networkConfig
  */
 function getTopology(numRays = NUM_RAYS) {
-    const inputs = numRays + 1; // Rayons + Vitesse instantanée
-    const outputs = 2;          // [Braquage, Accélération]
-
-    let hidden = [];
-    if (AUTO_NEURONS_PER_LAYER) {
-        // Formule adaptative : la première couche extrait les caractéristiques spatiales,
-        // les couches suivantes compressent vers les commandes de direction
-        const base = Math.max(6, Math.round(inputs * NEURON_RATIO_PER_RAY));
-        if (HIDDEN_LAYERS_COUNT === 1) {
-            hidden = [base];
-        } else if (HIDDEN_LAYERS_COUNT === 2) {
-            hidden = [
-                Math.round(base * 1.25),
-                Math.max(4, Math.round(base * 0.7))
-            ];
-        } else {
-            hidden = [
-                Math.round(base * 1.5),
-                base,
-                Math.max(4, Math.round(base * 0.5))
-            ];
-        }
-    } else {
-        // Mode manuel selon les curseurs de couches
-        hidden = MANUAL_LAYER_NEURONS.slice(0, HIDDEN_LAYERS_COUNT);
+    if (numRays !== networkConfig.inputSize) {
+        return [numRays, ...networkConfig.hiddenLayers, networkConfig.outputSize];
     }
-
-    return [inputs, ...hidden, outputs];
+    return networkConfig.getTopology();
 }
 
 /**
- * Met à jour le nombre d'assets et les dimensions globales
+ * Met à jour le nombre de rayons et synchronise networkConfig.inputSize
  */
 function updateRayCount(newRayCount) {
     NUM_RAYS = Math.max(3, Math.min(15, parseInt(newRayCount) || 5));
-    NB_ASSETS = NUM_RAYS + 1;
+    networkConfig.inputSize = NUM_RAYS;
 }

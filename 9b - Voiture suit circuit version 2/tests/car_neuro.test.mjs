@@ -1,8 +1,8 @@
 /**
  * car_neuro.test.mjs
  * Suite de tests unitaires automatisés pour 9b — Neuroévolution Racing.
- * Couvre la topologie dynamique, la variation des neurones selon les rayons,
- * la propagation du réseau multicouche, le lancer de rayons et la locomotion de Reynolds.
+ * Couvre la topologie dynamique (TESTS 1, 2, 3, 4 du cahier des charges),
+ * la règle stricte inputSize = numberOfRays, la locomotion Reynolds et les contrôles.
  */
 
 import test, { describe, it, beforeEach } from 'node:test';
@@ -118,64 +118,147 @@ function createTestingContext() {
         vm.runInContext(code, context);
     }
 
-    const exported = vm.runInContext('({ NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining })', context);
+    const exported = vm.runInContext('({ networkConfig, NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining })', context);
     return Object.assign(context, exported);
 }
 
-describe('9b Neuroévolution Racing — Tests Unitaires', () => {
+describe('9b Neuroévolution Racing — Tests Unitaires & Benchmarks Cahier des Charges', () => {
     let ctx;
 
     beforeEach(() => {
         ctx = createTestingContext();
     });
 
-    it('Topologie adaptative : le nombre de neurones varie proportionnellement aux rayons', () => {
-        const { getTopology, updateRayCount } = ctx;
+    // =========================================================================
+    // SECTION 15 DU CAHIER DES CHARGES : 4 BENCHMARKS DE TOPOLOGIE OBLIGATOIRES
+    // =========================================================================
 
-        // 1. Pour 5 rayons (inputs = 6)
-        updateRayCount(5);
-        const topo5 = getTopology(5);
-        assert.equal(topo5[0], 6, 'Inputs = numRays + 1 = 6');
-        assert.equal(topo5[topo5.length - 1], 2, 'Outputs = 2');
+    it('TEST 1 (Cahier des charges) : Rays = 5 → Topology = 5 → 10 → 6 → 2', () => {
+        const { networkConfig, Car, createVector } = ctx;
 
-        // 2. Pour 9 rayons (inputs = 10)
-        updateRayCount(9);
-        const topo9 = getTopology(9);
-        assert.equal(topo9[0], 10, 'Inputs = numRays + 1 = 10');
-        // Les neurones de la première couche cachée doivent être strictement supérieurs à ceux avec 5 rayons
-        assert.ok(topo9[1] > topo5[1], `Les neurones cachés doivent augmenter avec les rayons (${topo9[1]} > ${topo5[1]})`);
+        networkConfig.inputSize = 5;
+        networkConfig.hiddenLayers = [10, 6];
+        networkConfig.outputSize = 2;
 
-        // 3. Changement du nombre de couches (1, 2, 3)
-        ctx.HIDDEN_LAYERS_COUNT = 1;
-        const topo1L = getTopology(5);
-        assert.equal(topo1L.length, 3, 'Topologie à 1 couche cachée : [in, h1, out]');
+        assert.equal(networkConfig.formatTopology(), '5 → 10 → 6 → 2');
+        assert.deepEqual(Array.from(networkConfig.getTopology()), [5, 10, 6, 2]);
 
-        ctx.HIDDEN_LAYERS_COUNT = 3;
-        const topo3L = getTopology(5);
-        assert.equal(topo3L.length, 5, 'Topologie à 3 couches cachées : [in, h1, h2, h3, out]');
+        const car = new Car(null, 5);
+        assert.equal(car.numRays, 5, 'Nombre de rayons doit être 5');
+        assert.equal(car.rays.length, 5);
+        assert.equal(car.brain.input_nodes, 5, 'Nombre d inputs doit être strictement égal à 5');
+
+        const dummyWalls = [{ a: createVector(50, 0), b: createVector(50, 200) }];
+        const inputs = car.look(dummyWalls);
+        assert.equal(inputs.length, 5, 'Exactement 5 entrées issues des 5 rayons');
+
+        car.think(dummyWalls);
+        assert.ok(!Number.isNaN(car.acc.x));
+    });
+
+    it('TEST 2 (Cahier des charges) : Rays = 8 → Topology = 8 → 16 → 8 → 2', () => {
+        const { networkConfig, Car, createVector } = ctx;
+
+        networkConfig.inputSize = 8;
+        networkConfig.hiddenLayers = [16, 8];
+        networkConfig.outputSize = 2;
+
+        assert.equal(networkConfig.formatTopology(), '8 → 16 → 8 → 2');
+        assert.deepEqual(Array.from(networkConfig.getTopology()), [8, 16, 8, 2]);
+
+        const car = new Car(null, 8);
+        assert.equal(car.numRays, 8);
+        assert.equal(car.brain.input_nodes, 8);
+
+        const dummyWalls = [{ a: createVector(150, 0), b: createVector(150, 200) }];
+        const inputs = car.look(dummyWalls);
+        assert.equal(inputs.length, 8);
+
+        car.think(dummyWalls);
+        assert.ok(!Number.isNaN(car.acc.x));
+    });
+
+    it('TEST 3 (Cahier des charges) : Rays = 10 → Topology = 10 → 20 → 10 → 5 → 2', () => {
+        const { networkConfig, Car, createVector } = ctx;
+
+        networkConfig.inputSize = 10;
+        networkConfig.hiddenLayers = [20, 10, 5];
+        networkConfig.outputSize = 2;
+
+        assert.equal(networkConfig.formatTopology(), '10 → 20 → 10 → 5 → 2');
+        assert.deepEqual(Array.from(networkConfig.getTopology()), [10, 20, 10, 5, 2]);
+
+        const car = new Car(null, 10);
+        assert.equal(car.numRays, 10);
+        assert.equal(car.brain.input_nodes, 10);
+
+        const dummyWalls = [{ a: createVector(80, 0), b: createVector(80, 300) }];
+        const inputs = car.look(dummyWalls);
+        assert.equal(inputs.length, 10);
+
+        car.think(dummyWalls);
+        assert.ok(!Number.isNaN(car.acc.x));
+    });
+
+    it('TEST 4 (Cahier des charges) : Rays = 12 → Topology = 12 → 24 → 12 → 6 → 2', () => {
+        const { networkConfig, Car, createVector } = ctx;
+
+        networkConfig.inputSize = 12;
+        networkConfig.hiddenLayers = [24, 12, 6];
+        networkConfig.outputSize = 2;
+
+        assert.equal(networkConfig.formatTopology(), '12 → 24 → 12 → 6 → 2');
+        assert.deepEqual(Array.from(networkConfig.getTopology()), [12, 24, 12, 6, 2]);
+
+        const car = new Car(null, 12);
+        assert.equal(car.numRays, 12);
+        assert.equal(car.brain.input_nodes, 12);
+
+        const dummyWalls = [{ a: createVector(120, 0), b: createVector(120, 300) }];
+        const inputs = car.look(dummyWalls);
+        assert.equal(inputs.length, 12);
+
+        car.think(dummyWalls);
+        assert.ok(!Number.isNaN(car.acc.x));
+    });
+
+    // =========================================================================
+    // TESTS UNITAIRES DES FONCTIONNALITÉS ESSENTIELLES ET LIMITES
+    // =========================================================================
+
+    it('networkConfig.suggestLayers : calcule des tailles de couches intelligentes selon les rayons', () => {
+        const { networkConfig } = ctx;
+
+        // Si rayons = 10 et 3 couches demandées -> [20, 10, 5]
+        const suggested10 = networkConfig.suggestLayers(10, 3);
+        assert.deepEqual(Array.from(suggested10), [20, 10, 5]);
+
+        // Si rayons = 5 et 2 couches -> [10, 5] (ou [10, 6])
+        const suggested5 = networkConfig.suggestLayers(5, 2);
+        assert.equal(suggested5.length, 2);
+        assert.ok(suggested5[0] >= 8 && suggested5[0] <= 12);
     });
 
     it('NeuralNetwork : instanciation, prédiction et bornes des activations', () => {
         const { NeuralNetwork } = ctx;
 
-        const nn = new NeuralNetwork([6, 16, 8, 2]);
-        assert.equal(nn.input_nodes, 6);
+        const nn = new NeuralNetwork([5, 10, 6, 2]);
+        assert.equal(nn.input_nodes, 5);
         assert.equal(nn.output_nodes, 2);
         assert.equal(nn.weights.length, 3, '3 matrices de poids pour 4 couches');
 
-        const inputs = [0.2, 0.8, 0.5, 0.1, 0.9, 0.4];
+        const inputs = [0.2, 0.8, 0.5, 0.1, 0.9];
         const outputs = nn.predict(inputs);
 
         assert.equal(outputs.length, 2, 'Doit renvoyer exactement 2 sorties');
         assert.ok(outputs[0] >= 0 && outputs[0] <= 1, 'Sortie 0 dans [0, 1]');
         assert.ok(outputs[1] >= 0 && outputs[1] <= 1, 'Sortie 1 dans [0, 1]');
 
-        // Vérification de la conservation des activations pour le visualiseur HUD
         const acts = nn.getActivations();
         assert.equal(acts.length, 4, '4 couches d activations enregistrées');
-        assert.equal(acts[0].length, 6, 'Couche entrée = 6 neurones');
-        assert.equal(acts[1].length, 16, 'Couche cachée 1 = 16 neurones');
-        assert.equal(acts[2].length, 8, 'Couche cachée 2 = 8 neurones');
+        assert.equal(acts[0].length, 5, 'Couche entrée = 5 neurones');
+        assert.equal(acts[1].length, 10, 'Couche cachée 1 = 10 neurones');
+        assert.equal(acts[2].length, 6, 'Couche cachée 2 = 6 neurones');
         assert.equal(acts[3].length, 2, 'Couche sortie = 2 neurones');
     });
 
@@ -185,11 +268,9 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
         const parent = new NeuralNetwork([8, 12, 2]);
         const clone = parent.copy();
 
-        // Le clone doit avoir exactement les mêmes poids initiaux
         assert.equal(clone.weights[0][0][0], parent.weights[0][0][0]);
 
-        // La mutation doit modifier les poids du clone sans toucher au parent
-        clone.mutate(1.0, 0.5); // 100% de chance de mutation
+        clone.mutate(1.0, 0.5);
         assert.notEqual(clone.weights[0][0][0], parent.weights[0][0][0], 'Les poids mutés doivent être distincts');
         assert.ok(!Number.isNaN(clone.weights[0][0][0]), 'Poids valide sans NaN');
     });
@@ -213,9 +294,8 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
         const { Ray, createVector } = ctx;
 
         const pos = createVector(50, 50);
-        const ray = new Ray(pos, 0); // Rayon horizontal vers la droite (+X)
+        const ray = new Ray(pos, 0);
 
-        // Mur vertical en x = 100 de y = 0 à y = 100
         const wall = {
             a: createVector(100, 0),
             b: createVector(100, 100)
@@ -226,7 +306,6 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
         assert.equal(Math.round(pt.x), 100);
         assert.equal(Math.round(pt.y), 50);
 
-        // Mur parallèle (horizontal en y = 80) : pas d'intersection
         const parallelWall = {
             a: createVector(0, 80),
             b: createVector(200, 80)
@@ -238,13 +317,13 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
     it('Car : respecte le modèle Reynolds (applyForce et mise à jour de la locomotion)', () => {
         const { Car, createVector } = ctx;
 
-        ctx.GAME_SPEED_LIMIT = 8;
-        ctx.CAR_MAX_FORCE = 0.6;
+        ctx.GAME_SPEED_LIMIT = 5.0;
+        ctx.CAR_MAX_FORCE = 0.5;
 
         const car = new Car(null, 5);
         assert.equal(car.numRays, 5);
         assert.equal(car.rays.length, 5);
-        assert.equal(car.maxSpeed, 8);
+        assert.equal(car.maxSpeed, 5.0);
 
         const initialPos = car.pos.copy();
         const force = createVector(0.5, 0);
@@ -253,22 +332,6 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
 
         assert.ok(car.pos.x !== initialPos.x || car.pos.y !== initialPos.y, 'La position doit évoluer suite à la force');
         assert.ok(car.vel.mag() <= car.maxSpeed, 'La vitesse doit respecter maxSpeed');
-    });
-
-    it('Car : adapte automatiquement ses rayons et entrées si configuré', () => {
-        const { Car, createVector } = ctx;
-
-        const car7 = new Car(null, 7);
-        assert.equal(car7.numRays, 7);
-        assert.equal(car7.rays.length, 7);
-
-        const walls = [{
-            a: createVector(200, 0),
-            b: createVector(200, 400)
-        }];
-
-        const inputs = car7.look(walls);
-        assert.equal(inputs.length, 8, '7 rayons + 1 vitesse = 8 entrées');
     });
 
     it('Car : think() applique une force de braquage bornée par maxForce', () => {
@@ -303,7 +366,6 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
     it('Genetic : élitisme préserve intact le champion et la sélection par tournoi fonctionne', () => {
         const { Car, nextGeneration } = ctx;
 
-        // Préparation de 5 voitures sauvegardées avec scores distincts
         ctx.savedCars = [];
         for (let i = 0; i < 5; i++) {
             let c = new Car(null, 5);
@@ -318,46 +380,20 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
         assert.ok(ctx.championModel !== null, 'Le modèle champion doit être conservé');
     });
 
-    it('Vitesse maximale réglable : supporte les vitesses élevées (ex: 25 px/frame)', () => {
+    it('Vitesse maximale réglable : supporte les vitesses élevées (ex: 15 px/frame)', () => {
         const { Car, createVector } = ctx;
 
-        ctx.GAME_SPEED_LIMIT = 25;
+        ctx.GAME_SPEED_LIMIT = 15;
         const car = new Car(null, 5);
-        assert.equal(car.maxSpeed, 25);
+        assert.equal(car.maxSpeed, 15);
 
         for (let i = 0; i < 30; i++) {
             car.applyForce(createVector(2, 0));
             car.update();
         }
 
-        assert.ok(car.vel.mag() <= 25, 'La vitesse doit être plafonnée à 25');
-        assert.ok(car.vel.mag() > 10, 'Le véhicule doit avoir fortement accéléré');
-    });
-
-    it('Haute densité de capteurs : 15 rayons génèrent 16 entrées et une topologie proportionnée', () => {
-        const { Car, getTopology, createVector } = ctx;
-
-        ctx.updateRayCount(15);
-        const topo15 = getTopology(15);
-        assert.equal(topo15[0], 16, '15 rayons + 1 vitesse = 16 inputs');
-
-        const car15 = new Car(null, 15);
-        assert.equal(car15.rays.length, 15);
-
-        const dummyWalls = [{ a: createVector(50, 0), b: createVector(50, 200) }];
-        const inputs = car15.look(dummyWalls);
-        assert.equal(inputs.length, 16);
-    });
-
-    it('Mode manuel de topologie : utilise exactement les neurones configurés par couche', () => {
-        const { getTopology } = ctx;
-
-        ctx.AUTO_NEURONS_PER_LAYER = false;
-        ctx.HIDDEN_LAYERS_COUNT = 3;
-        ctx.MANUAL_LAYER_NEURONS = [28, 14, 7];
-
-        const topo = getTopology(5);
-        assert.deepEqual(Array.from(topo), [6, 28, 14, 7, 2], 'Doit respecter strictement la configuration manuelle');
+        assert.ok(car.vel.mag() <= 15, 'La vitesse doit être plafonnée à 15');
+        assert.ok(car.vel.mag() > 8, 'Le véhicule doit avoir fortement accéléré');
     });
 
     it('Ray.cast : robustesse absolue face aux segments nuls ou valeurs invalides', () => {
@@ -367,7 +403,6 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
         assert.equal(ray.cast(null), null);
         assert.equal(ray.cast({ a: null, b: null }), null);
 
-        // Segment dégénéré en un point
         const degenerate = { a: createVector(10, 10), b: createVector(10, 10) };
         assert.equal(ray.cast(degenerate), null);
     });
@@ -379,7 +414,6 @@ describe('9b Neuroévolution Racing — Tests Unitaires', () => {
         const dummyWalls = [{ a: createVector(300, 0), b: createVector(300, 500) }];
         const dummyCps = [{ a: createVector(100, 0), b: createVector(100, 200) }];
 
-        // Simulation de 100 pas consécutifs
         for (let s = 0; s < 100; s++) {
             car.look(dummyWalls);
             car.think(dummyWalls);

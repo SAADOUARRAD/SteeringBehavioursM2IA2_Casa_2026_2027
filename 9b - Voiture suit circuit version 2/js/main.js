@@ -1,9 +1,13 @@
 /**
- * main.js
- * Contrôleur principal de Neuroévolution Racing 9b.
- * Gère la boucle de simulation accélérée, la télémétrie motorsport,
- * le visualiseur de réseau de neurones en direct et l'interface utilisateur.
+ * main.js — Neuroévolution Racing 9b
+ * Contrôleur principal avec configuration dynamique de topologie,
+ * génération automatique des sliders de couches cachées, bouton APPLY NETWORK,
+ * contrôles d'entraînement (START, PAUSE, RESET) et visualisation schématique.
  */
+
+// Variables locales pour la prévisualisation avant clic sur APPLY NETWORK
+let pendingRays = NUM_RAYS;
+let pendingHiddenLayers = [...networkConfig.hiddenLayers];
 
 function setup() {
     let canvas = createCanvas(windowWidth, windowHeight);
@@ -11,7 +15,7 @@ function setup() {
 
     setupTrack(true);
     resetTraining(true);
-    bindUIControls();
+    initDynamicUI();
 }
 
 function windowResized() {
@@ -22,16 +26,16 @@ function windowResized() {
 function draw() {
     background(11, 14, 20);
 
-    // Rendu des tuiles de décor et piste
+    // Rendu des cartes LEGO et du tracé du circuit
     showTiles();
 
-    // Boucle de simulation temporelle (Accélérateur d'entraînement)
+    // Boucle de simulation (Vitesse d'entraînement / Time Warp)
     let steps = TRAINING_PAUSED ? 0 : SIMULATION_SPEED;
     for (let s = 0; s < steps; s++) {
         updateSimulationStep();
     }
 
-    // Caméra centrée sur le leader si le mode FOCUS est activé
+    // Caméra centrée sur le leader si activé
     push();
     if (FOCUS_BEST_CAR && bestCar && !bestCar.dead) {
         let targetX = width / 2 - bestCar.pos.x;
@@ -57,14 +61,13 @@ function draw() {
         wall.show();
     }
 
-    // 3. Dessin des voitures (les autres d'abord, puis le leader en surbrillance)
+    // 3. Dessin des voitures
     for (let car of cars) {
         if (car !== bestCar) car.show(false, DEBUG_MODE);
     }
 
     if (bestCar) {
         bestCar.show(true, DEBUG_MODE);
-        // Trait laser bleu guidant vers le prochain checkpoint
         if (checkpoints.length > 0) {
             let target = checkpoints[bestCar.checkpointIndex % checkpoints.length];
             let center = p5.Vector.add(target.a, target.b).div(2);
@@ -78,17 +81,17 @@ function draw() {
 
     pop(); // Fin de la transformation caméra
 
-    // 4. Visualiseur de Réseau de Neurones en Direct (HUD haute technologie)
+    // 4. Visualiseur Schématique du Réseau de Neurones (Section 13 du cours)
     if (SHOW_NN_VISUALIZER) {
-        drawNeuralNetworkVisualizer();
+        drawSchematicNetworkVisualizer();
     }
 
-    // 5. Dashboard et Télémétrie Motorsport
-    drawHUD();
+    // 5. Mise à jour de la télémétrie dans le DOM et sur le canvas
+    updateTelemetryUI();
 }
 
 /**
- * Une étape élémentaire d'évolution physique et décisionnelle
+ * Une étape élémentaire de simulation physique et neuro-décisionnelle
  */
 function updateSimulationStep() {
     let maxScore = -1;
@@ -107,7 +110,6 @@ function updateSimulationStep() {
         if (car.dead) {
             savedCars.push(cars.splice(i, 1)[0]);
         } else {
-            // Détection du leader actuel
             let distToNext = Infinity;
             if (checkpoints.length > 0) {
                 let goal = checkpoints[car.checkpointIndex % checkpoints.length];
@@ -140,17 +142,19 @@ function checkCollisions(car) {
         }
     }
 
-    // Sortie de l'écran
     if (car.pos.x < 0 || car.pos.x > width || car.pos.y < 0 || car.pos.y > height) {
         car.dead = true;
     }
 }
 
 /**
- * Visualiseur interactif du Réseau de Neurones en direct (HUD)
- * Dessine les neurones par couche, leurs activations instantanées et les synapses pondérées
+ * ============================================================================
+ * VISUALISATION DU RÉSEAU DE NEURONES (Section 13 du cours)
+ * ============================================================================
+ * Affiche la topologie actuelle avec couches verticales/horizontales,
+ * les neurones actifs illuminés et les synapses pondérées.
  */
-function drawNeuralNetworkVisualizer() {
+function drawSchematicNetworkVisualizer() {
     let activeCar = bestCar || (cars.length > 0 ? cars[0] : null);
     if (!activeCar || !activeCar.brain) return;
 
@@ -158,45 +162,52 @@ function drawNeuralNetworkVisualizer() {
     let topology = brain.topology;
     let activations = brain.getActivations();
 
-    let boxW = 280;
-    let boxH = 175;
-    let boxX = width - boxW - 20;
+    let boxW = 290;
+    let boxH = 180;
+    let boxX = 20;
     let boxY = height - boxH - 20;
 
     push();
-    // Cadre futuriste semi-transparent
-    fill(15, 23, 42, 220);
-    stroke(56, 189, 248, 100);
+    // Cadre sombre avec bordure cyan luminescente
+    fill(13, 19, 33, 230);
+    stroke(56, 189, 248, 120);
     strokeWeight(1.5);
-    rect(boxX, boxY, boxW, boxH, 8);
+    rect(boxX, boxY, boxW, boxH, 10);
 
-    // Titre de l'architecture
+    // Titre et topologie
     noStroke();
-    fill(203, 213, 225);
+    fill(248, 250, 252);
     textSize(11);
     textAlign(LEFT, TOP);
-    text(`🧠 RÉSEAU IA : [${topology.join('-')}] (${NUM_RAYS} rayons)`, boxX + 12, boxY + 8);
+    textStyle(BOLD);
+    text(`🧠 TOPOLOGIE : ${topology.join(' → ')}`, boxX + 12, boxY + 10);
+
+    textStyle(NORMAL);
+    fill(148, 163, 184);
+    textSize(9);
+    text(`Rayons: ${NUM_RAYS} | Couches cachées: ${topology.length - 2}`, boxX + 12, boxY + 24);
 
     let numLayers = topology.length;
     let layerSpacing = (boxW - 40) / Math.max(1, numLayers - 1);
     let layerPositions = [];
 
-    // Calcul des positions de chaque neurone
+    // Calcul des positions des neurones par couche
     for (let l = 0; l < numLayers; l++) {
         let count = topology[l];
         let x = boxX + 20 + l * layerSpacing;
         let nodes = [];
-        let nodeSpacing = (boxH - 45) / Math.max(1, count);
-        let startY = boxY + 30 + (boxH - 45 - (count - 1) * nodeSpacing) / 2;
+        let displayCount = Math.min(count, 12); // Plafonné visuellement si couche très dense
+        let nodeSpacing = (boxH - 65) / Math.max(1, displayCount - 1);
+        let startY = boxY + 42 + (boxH - 65 - (displayCount - 1) * nodeSpacing) / 2;
 
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < displayCount; i++) {
             let y = startY + i * nodeSpacing;
-            nodes.push({ x, y });
+            nodes.push({ x, y, origIndex: i });
         }
         layerPositions.push(nodes);
     }
 
-    // 1. Dessin des synapses avec couleurs selon le signe et intensité du poids
+    // 1. Tracé des synapses pondérées
     for (let l = 0; l < brain.weights.length; l++) {
         let W = brain.weights[l];
         let fromNodes = layerPositions[l];
@@ -204,14 +215,14 @@ function drawNeuralNetworkVisualizer() {
 
         for (let i = 0; i < fromNodes.length; i++) {
             for (let j = 0; j < toNodes.length; j++) {
-                let weight = W[i] ? W[i][j] : 0;
+                let weight = (W[i] && W[i][j] !== undefined) ? W[i][j] : 0;
                 let absW = Math.abs(weight);
-                let alpha = constrain(absW * 140, 20, 220);
+                let alpha = constrain(absW * 160, 25, 230);
 
                 if (weight > 0) {
-                    stroke(56, 189, 248, alpha); // Cyan pour excitation
+                    stroke(56, 189, 248, alpha); // Excitation : Cyan
                 } else {
-                    stroke(244, 63, 94, alpha);  // Rose / Rouge pour inhibition
+                    stroke(244, 63, 94, alpha);  // Inhibition : Rose/Rouge
                 }
                 strokeWeight(constrain(absW * 1.5, 0.4, 2.2));
                 line(fromNodes[i].x, fromNodes[i].y, toNodes[j].x, toNodes[j].y);
@@ -219,266 +230,170 @@ function drawNeuralNetworkVisualizer() {
         }
     }
 
-    // 2. Dessin des neurones avec halo selon leur niveau d'activation
+    // 2. Dessin des neurones avec halos d'activation
     for (let l = 0; l < numLayers; l++) {
         let acts = activations[l] || [];
         for (let i = 0; i < layerPositions[l].length; i++) {
             let pos = layerPositions[l][i];
-            let act = acts[i] !== undefined ? acts[i] : 0.5;
+            let act = acts[pos.origIndex] !== undefined ? acts[pos.origIndex] : 0.5;
 
-            // Halo d'énergie
+            // Halo luminescent
             noStroke();
-            fill(56, 189, 248, act * 150);
+            fill(56, 189, 248, act * 160);
             circle(pos.x, pos.y, 11);
 
             // Corps du neurone
             fill(act > 0.5 ? color(16, 185, 129) : color(30, 41, 59));
-            stroke(255, 255, 255, 200);
+            stroke(255, 255, 255, 220);
             strokeWeight(1);
             circle(pos.x, pos.y, 6.5);
         }
     }
 
-    // Étiquettes Entrées / Sorties
+    // Légendes en bas
     fill(148, 163, 184);
-    textSize(8.5);
+    textSize(8);
     textAlign(CENTER, CENTER);
-    text("Capteurs", boxX + 20, boxY + boxH - 8);
-    text("Commandes", boxX + boxW - 25, boxY + boxH - 8);
+    text("INPUT", boxX + 20, boxY + boxH - 10);
+    text("OUTPUT", boxX + boxW - 22, boxY + boxH - 10);
 
     pop();
 }
 
 /**
- * Télémétrie Motorsport & HUD haute performance
+ * Met à jour les statistiques de télémétrie dans le panneau HTML
  */
-function drawHUD() {
-    push();
-    textAlign(LEFT, TOP);
-
-    const marginX = 25;
-    const startY = 20;
-
-    // Panneau de télémétrie moderne
-    fill(15, 23, 42, 190);
-    stroke(56, 189, 248, 80);
-    strokeWeight(1);
-    rect(marginX - 10, startY - 10, 250, 160, 8);
-
-    // Titre
-    fill(56, 189, 248);
-    textSize(13);
-    textStyle(BOLD);
-    text("🏁 TÉLÉMÉTRIE MOTORSPORT", marginX, startY);
-
-    textStyle(NORMAL);
-    textSize(11);
-    fill(226, 232, 240);
+function updateTelemetryUI() {
+    const elGen = document.getElementById('statGen');
+    const elAlive = document.getElementById('statAlive');
+    const elBestFit = document.getElementById('statBestFit');
+    const elAvgFit = document.getElementById('statAvgFit');
 
     let aliveCount = cars.filter(c => !c.dead).length;
-    let curSpeed = (bestCar && !bestCar.dead) ? bestCar.vel.mag() : 0;
-    let kmh = (curSpeed * 18).toFixed(0);
+    let currentBest = 0;
+    let currentAvg = 0;
 
-    text(`🧬 Génération : ${generation}`, marginX, startY + 22);
-    text(`🏎️ Voitures en piste : ${aliveCount} / ${TOTAL_POP}`, marginX, startY + 38);
-    text(`⚡ Vitesse Leader : ${kmh} km/h (max: ${(GAME_SPEED_LIMIT * 18).toFixed(0)})`, marginX, startY + 54);
-    text(`📡 Rayons actifs : ${NUM_RAYS} (Portée: ${SIGHT_DIST}px)`, marginX, startY + 70);
-    text(`🧠 Topologie : [${getTopology(NUM_RAYS).join('-')}]`, marginX, startY + 86);
-    text(`⏱️ Vitesse simu : ${SIMULATION_SPEED}x ${TRAINING_PAUSED ? '(PAUSE)' : ''}`, marginX, startY + 102);
-
-    if (bestLapTimeRecord) {
-        fill(245, 158, 11);
-        text(`🏆 Record du tour : ${bestLapTimeRecord.toFixed(2)}s`, marginX, startY + 118);
-    } else {
-        fill(148, 163, 184);
-        text(`🎯 Record du tour : En attente...`, marginX, startY + 118);
+    if (savedCars.length > 0 || cars.length > 0) {
+        let allScores = [...cars, ...savedCars].map(c => c.score);
+        if (allScores.length > 0) {
+            currentBest = Math.max(...allScores);
+            currentAvg = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+        }
     }
 
-    // Barre de progression du tour pour le leader
-    if (bestCar && checkpoints.length > 0) {
-        let progress = (bestCar.checkpointIndex / checkpoints.length);
-        fill(30, 41, 59);
-        rect(marginX, startY + 136, 220, 8, 4);
-        fill(16, 185, 129);
-        rect(marginX, startY + 136, 220 * progress, 8, 4);
+    if (currentBest > bestFitnessRecord) {
+        bestFitnessRecord = currentBest;
     }
 
-    // Message d'entraînement terminé si 60% de réussite
-    if (trainingFinished) {
-        fill(16, 185, 129, 230);
-        stroke(255);
-        strokeWeight(2);
-        rect(width / 2 - 200, 30, 400, 50, 10);
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(18);
-        textStyle(BOLD);
-        text("🏆 ENTRAÎNEMENT RÉUSSI (> 60%) !", width / 2, 55);
-    }
-
-    pop();
+    if (elGen) elGen.innerText = generation;
+    if (elAlive) elAlive.innerText = `${aliveCount} / ${TOTAL_POP}`;
+    if (elBestFit) elBestFit.innerText = Math.round(bestFitnessRecord);
+    if (elAvgFit) elAvgFit.innerText = Math.round(currentAvg);
 }
 
 /**
- * Raccourcis clavier interactifs
+ * ============================================================================
+ * INTERFACE DYNAMIQUE ET ÉVÉNEMENTS (Sections 1 à 14 du cours)
+ * ============================================================================
  */
-function keyPressed() {
-    if (document.activeElement?.matches('input, select, textarea')) return;
-
-    if (key === 'd' || key === 'D') {
-        DEBUG_MODE = !DEBUG_MODE;
-        console.log("Mode Debug:", DEBUG_MODE ? "ON" : "OFF");
-    } else if (key === 'n' || key === 'N') {
-        SHOW_NN_VISUALIZER = !SHOW_NN_VISUALIZER;
-    } else if (key === 'g' || key === 'G') {
-        // Forcer immédiatement la génération suivante
-        for (let car of cars) car.dead = true;
-    } else if (key === 'f' || key === 'F') {
-        FOCUS_BEST_CAR = !FOCUS_BEST_CAR;
-    } else if (key === 'r' || key === 'R') {
-        resetTraining(false);
-    } else if (key === ' ') {
-        TRAINING_PAUSED = !TRAINING_PAUSED;
-    } else if (key === 's' || key === 'S') {
-        saveChampionModel();
-    } else if (key === 'l' || key === 'L') {
-        loadChampionModel();
-    } else if (key === '+' || key === '=') {
-        SIMULATION_SPEED = Math.min(20, SIMULATION_SPEED + 1);
-        updateSpeedUI();
-    } else if (key === '-' || key === '_') {
-        SIMULATION_SPEED = Math.max(1, SIMULATION_SPEED - 1);
-        updateSpeedUI();
-    }
-}
-
-function updateSpeedUI() {
-    const sel = document.getElementById('simSpeedSelect');
-    if (sel) sel.value = SIMULATION_SPEED;
-}
-
-/**
- * Liaison des événements des curseurs et contrôles DOM
- */
-function bindUIControls() {
+function initDynamicUI() {
     const link = (id, event, callback) => {
         const el = document.getElementById(id);
         if (el) el.addEventListener(event, callback);
         return el;
     };
 
-    // Vitesse Max
-    link('speedSlider', 'input', (e) => {
-        GAME_SPEED_LIMIT = parseFloat(e.target.value);
-        document.getElementById('speedVal').innerText = GAME_SPEED_LIMIT;
-    });
-
-    // Accélération / Braquage
-    link('forceSlider', 'input', (e) => {
-        CAR_MAX_FORCE = parseFloat(e.target.value);
-        document.getElementById('forceVal').innerText = CAR_MAX_FORCE.toFixed(2);
-    });
-
-    // Nombre de Rayons Capteurs
+    // 1. Slider NOMBRE DE RAYONS
     link('raysSlider', 'input', (e) => {
-        updateRayCount(e.target.value);
-        document.getElementById('raysVal').innerText = NUM_RAYS;
-        updateDynamicTopologyUI();
-        resetTraining(true);
+        pendingRays = parseInt(e.target.value) || 5;
+        document.getElementById('raysVal').innerText = pendingRays;
+        // Met à jour automatiquement les suggestions de neurones pour rester cohérent avec les rayons
+        let numLayers = pendingHiddenLayers.length;
+        pendingHiddenLayers = networkConfig.suggestLayers(pendingRays, numLayers);
+        renderDynamicLayerSliders();
+        updatePendingTopologyDisplay();
     });
 
-    // Portée des Rayons
+    // 2. Slider NOMBRE DE COUCHES CACHÉES (1 à 5)
+    link('hiddenLayersSlider', 'input', (e) => {
+        let numLayers = parseInt(e.target.value) || 2;
+        document.getElementById('hiddenLayersVal').innerText = numLayers;
+        // Adapte le tableau pendingHiddenLayers à la nouvelle taille
+        pendingHiddenLayers = networkConfig.suggestLayers(pendingRays, numLayers);
+        renderDynamicLayerSliders();
+        updatePendingTopologyDisplay();
+    });
+
+    // 3. Portée et FOV
     link('sightSlider', 'input', (e) => {
         SIGHT_DIST = parseInt(e.target.value);
-        document.getElementById('sightVal').innerText = `${SIGHT_DIST}px`;
+        document.getElementById('sightVal').innerText = `${SIGHT_DIST} px`;
     });
 
-    // Champ de Vision (FOV)
     link('fovSlider', 'input', (e) => {
         let deg = parseInt(e.target.value);
         FOV = (deg * Math.PI) / 180;
         document.getElementById('fovVal').innerText = `${deg}°`;
     });
 
-    // Nombre de Couches Cachées
-    link('layersCountSlider', 'input', (e) => {
-        HIDDEN_LAYERS_COUNT = parseInt(e.target.value);
-        document.getElementById('layersCountVal').innerText = HIDDEN_LAYERS_COUNT;
-        updateDynamicTopologyUI();
-        resetTraining(true);
+    // 4. VITESSE MAXIMALE & FORCE DE STEERING
+    link('speedSlider', 'input', (e) => {
+        GAME_SPEED_LIMIT = parseFloat(e.target.value);
+        document.getElementById('speedVal').innerText = GAME_SPEED_LIMIT.toFixed(1);
     });
 
-    // Case à cocher : Neurones variables selon les rayons
-    link('autoNeuronsCheck', 'change', (e) => {
-        AUTO_NEURONS_PER_LAYER = e.target.checked;
-        const manualGroup = document.getElementById('manualNeuronsGroup');
-        const autoGroup = document.getElementById('autoNeuronsGroup');
-        if (manualGroup) manualGroup.style.display = AUTO_NEURONS_PER_LAYER ? 'none' : 'block';
-        if (autoGroup) autoGroup.style.display = AUTO_NEURONS_PER_LAYER ? 'block' : 'none';
-        updateDynamicTopologyUI();
-        resetTraining(true);
+    link('forceSlider', 'input', (e) => {
+        CAR_MAX_FORCE = parseFloat(e.target.value);
+        document.getElementById('forceVal').innerText = CAR_MAX_FORCE.toFixed(2);
     });
 
-    // Multiplicateur / Ratio de neurones par rayon
-    link('ratioNeuronsSlider', 'input', (e) => {
-        NEURON_RATIO_PER_RAY = parseFloat(e.target.value);
-        document.getElementById('ratioNeuronsVal').innerText = `${NEURON_RATIO_PER_RAY.toFixed(1)}x`;
-        updateDynamicTopologyUI();
-        resetTraining(true);
-    });
-
-    // Sliders manuels par couche
-    ['layer1Slider', 'layer2Slider', 'layer3Slider'].forEach((id, idx) => {
-        link(id, 'input', (e) => {
-            MANUAL_LAYER_NEURONS[idx] = parseInt(e.target.value);
-            document.getElementById(`${id}Val`).innerText = e.target.value;
-            updateDynamicTopologyUI();
-            resetTraining(true);
-        });
-    });
-
-    // Vitesse de Simulation (Time Warp)
+    // 5. VITESSE DE SIMULATION
     link('simSpeedSelect', 'change', (e) => {
-        SIMULATION_SPEED = parseInt(e.target.value);
+        SIMULATION_SPEED = parseFloat(e.target.value) || 1;
     });
 
-    // Taux de Mutation
-    link('mutSlider', 'input', (e) => {
-        MUTATION_RATE = parseFloat(e.target.value);
-        document.getElementById('mutVal').innerText = `${(MUTATION_RATE * 100).toFixed(0)}%`;
-    });
-
-    // Taille de la Population
+    // 6. POPULATION & MUTATION
     link('popSlider', 'input', (e) => {
         TOTAL_POP = parseInt(e.target.value);
         document.getElementById('popVal').innerText = TOTAL_POP;
+    });
+
+    link('mutSlider', 'input', (e) => {
+        MUTATION_RATE = parseFloat(e.target.value);
+        document.getElementById('mutVal').innerText = `${Math.round(MUTATION_RATE * 100)}%`;
+    });
+
+    // 7. BOUTON MAJEUR : [ APPLY NETWORK ] (Section 11 du cours)
+    link('btnApplyNetwork', 'click', () => {
+        applyNewNetworkTopology();
+    });
+
+    // 8. BOUTONS D'ENTRAÎNEMENT : [ START ], [ PAUSE ], [ RESET ], [ FORCE GEN ]
+    link('btnStart', 'click', () => {
+        TRAINING_PAUSED = false;
+        console.log("Entraînement démarré.");
+    });
+
+    link('btnPause', 'click', () => {
+        TRAINING_PAUSED = !TRAINING_PAUSED;
+        console.log("Entraînement en pause :", TRAINING_PAUSED);
+    });
+
+    link('btnReset', 'click', () => {
         resetTraining(true);
     });
 
-    // Complexité du Circuit
-    link('diffSlider', 'input', (e) => {
-        TRACK_DIFFICULTY = parseInt(e.target.value);
-        document.getElementById('diffVal').innerText = TRACK_DIFFICULTY;
-        trainingFinished = false;
-        setupTrack(true);
-    });
-
-    // Largeur de la piste
-    link('widthSlider', 'input', (e) => {
-        TRACK_WIDTH = parseInt(e.target.value);
-        document.getElementById('widthVal').innerText = TRACK_WIDTH;
-        trainingFinished = false;
-        setupTrack(true);
-    });
-
-    // Boutons d'Action Rapide
     link('btnNextGen', 'click', () => {
         for (let car of cars) car.dead = true;
     });
 
-    link('btnResetTrain', 'click', () => {
-        resetTraining(true);
+    // Boutons utilitaires
+    link('btnToggleNN', 'click', () => {
+        SHOW_NN_VISUALIZER = !SHOW_NN_VISUALIZER;
+    });
+
+    link('btnToggleDebug', 'click', () => {
+        DEBUG_MODE = !DEBUG_MODE;
     });
 
     link('btnSaveModel', 'click', () => {
@@ -489,29 +404,146 @@ function bindUIControls() {
         loadChampionModel();
     });
 
-    link('btnToggleNN', 'click', () => {
-        SHOW_NN_VISUALIZER = !SHOW_NN_VISUALIZER;
-    });
-
-    link('btnToggleDebug', 'click', () => {
-        DEBUG_MODE = !DEBUG_MODE;
-    });
-
-    link('btnTogglePause', 'click', () => {
-        TRAINING_PAUSED = !TRAINING_PAUSED;
-        document.getElementById('btnTogglePause').innerText = TRAINING_PAUSED ? "▶ Reprendre" : "⏸ Pause";
-    });
-
-    updateDynamicTopologyUI();
+    // Génération initiale des sliders de couches cachées
+    renderDynamicLayerSliders();
+    updatePendingTopologyDisplay();
+    updateActiveTopologyBadge();
 }
 
 /**
- * Affiche la formule et la topologie résultante dans la UI
+ * Génère dynamiquement les sliders pour chaque couche cachée (Section 3 & 4 du cours)
  */
-function updateDynamicTopologyUI() {
-    const topo = getTopology(NUM_RAYS);
+function renderDynamicLayerSliders() {
+    const container = document.getElementById('dynamicLayersContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    pendingHiddenLayers.forEach((neurons, index) => {
+        const row = document.createElement('div');
+        row.className = 'dynamic-layer-item';
+
+        const labelRow = document.createElement('div');
+        labelRow.className = 'label-info';
+
+        const label = document.createElement('label');
+        label.innerText = `Couche Cachée ${index + 1} :`;
+
+        const valSpan = document.createElement('span');
+        valSpan.className = 'value-tag';
+        valSpan.id = `layer_${index}_val`;
+        valSpan.innerText = `${neurons} n`;
+
+        labelRow.appendChild(label);
+        labelRow.appendChild(valSpan);
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '2';
+        slider.max = '40';
+        slider.step = '1';
+        slider.value = neurons;
+        slider.id = `layer_${index}_slider`;
+
+        slider.addEventListener('input', (e) => {
+            let n = parseInt(e.target.value) || 2;
+            pendingHiddenLayers[index] = n;
+            valSpan.innerText = `${n} n`;
+            updatePendingTopologyDisplay();
+        });
+
+        row.appendChild(labelRow);
+        row.appendChild(slider);
+        container.appendChild(row);
+    });
+}
+
+/**
+ * Met à jour l'affichage de la topologie en cours de configuration
+ */
+function updatePendingTopologyDisplay() {
+    const previewEl = document.getElementById('pendingTopologyDisplay');
+    if (previewEl) {
+        let topo = [pendingRays, ...pendingHiddenLayers, networkConfig.outputSize];
+        previewEl.innerText = topo.join(' → ');
+    }
+}
+
+/**
+ * Met à jour le badge de la topologie actuellement active dans la simulation
+ */
+function updateActiveTopologyBadge() {
     const badge = document.getElementById('topologyBadge');
     if (badge) {
-        badge.innerText = `[${topo.join(' → ')}]`;
+        badge.innerText = networkConfig.formatTopology();
+    }
+}
+
+/**
+ * ============================================================================
+ * APPLICATION DU NOUVEAU RÉSEAU (Section 11 du cours)
+ * ============================================================================
+ * 1. Arrête temporairement l'entraînement
+ * 2. Reconstruit le réseau de neurones
+ * 3. Adapte automatiquement le nombre d'inputs aux rayons
+ * 4. Recrée les couches cachées
+ * 5. Conserve le nombre de sorties nécessaire (2)
+ * 6. Recrée les cerveaux des véhicules
+ * 7. Remet la génération à 1
+ * 8. Permet de recommencer l'entraînement
+ */
+function applyNewNetworkTopology() {
+    TRAINING_PAUSED = true;
+
+    // 1. Mise à jour de la configuration globale
+    NUM_RAYS = pendingRays;
+    networkConfig.inputSize = NUM_RAYS;
+    networkConfig.hiddenLayers = [...pendingHiddenLayers];
+
+    // 2. Mise à jour des badges
+    updateActiveTopologyBadge();
+
+    // 3. Réinitialisation complète de la population
+    for (let car of cars) car.dispose();
+    for (let car of savedCars) car.dispose();
+    cars = [];
+    savedCars = [];
+    bestCar = null;
+    championModel = null;
+    bestFitnessRecord = 0;
+    generation = 1;
+    trainingFinished = false;
+
+    // 4. Instanciation des véhicules avec le nouveau cerveau et les nouveaux rayons
+    for (let i = 0; i < TOTAL_POP; i++) {
+        cars.push(new Car(null, NUM_RAYS));
+    }
+
+    TRAINING_PAUSED = false;
+    console.log(`✅ Nouveau réseau appliqué avec succès ! Topologie : ${networkConfig.formatTopology()}`);
+}
+
+/**
+ * Raccourcis clavier
+ */
+function keyPressed() {
+    if (document.activeElement?.matches('input, select, textarea')) return;
+
+    if (key === 'd' || key === 'D') {
+        DEBUG_MODE = !DEBUG_MODE;
+    } else if (key === 'n' || key === 'N') {
+        SHOW_NN_VISUALIZER = !SHOW_NN_VISUALIZER;
+    } else if (key === 'g' || key === 'G') {
+        for (let car of cars) car.dead = true;
+    } else if (key === 'f' || key === 'F') {
+        FOCUS_BEST_CAR = !FOCUS_BEST_CAR;
+    } else if (key === 'r' || key === 'R') {
+        resetTraining(true);
+    } else if (key === ' ') {
+        TRAINING_PAUSED = !TRAINING_PAUSED;
+    } else if (key === 's' || key === 'S') {
+        saveChampionModel();
+    } else if (key === 'l' || key === 'L') {
+        loadChampionModel();
     }
 }

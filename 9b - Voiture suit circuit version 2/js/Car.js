@@ -280,12 +280,7 @@ class Car {
             ray.hitFraction = record / SIGHT_DIST; // 0 = contact, 1 = dégagé
         }
 
-        // Dernière entrée : Vitesse actuelle normalisée
-        let speedMag = (typeof this.vel.mag === 'function') ? this.vel.mag() : Math.hypot(this.vel.x, this.vel.y);
-        inputs[nRays] = (typeof map === 'function')
-            ? map(speedMag, 0, Math.max(1, this.maxSpeed), 0, 1)
-            : Math.max(0, Math.min(1, speedMag / Math.max(1, this.maxSpeed)));
-
+        // Le nombre d'entrées du réseau correspond exactement au nombre de rayons
         return inputs;
     }
 

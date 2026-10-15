@@ -1,141 +1,230 @@
+/**
+ * Car.js
+ * Véhicule autonome guidé par réseau de neurones multicouche et capteurs laser.
+ * Conforme au modèle de Reynolds : locomotion par applyForce() et steering vectoriel.
+ */
+
 class Car {
-    constructor(brain) {
-        // Physique
-        this.pos = createVector(startX + random(-3, 3), startY + random(-3, 3));
-        // Démarrage avec une petite vitesse dans la bonne direction pour éviter le "sur place"
-        let angle = window.startAngle || 0;
-        this.vel = p5.Vector.fromAngle(angle);
-        this.vel.mult(1.0); // Plus d'impulsion au départ
-        this.acc = createVector(0, 0);
+    /**
+     * @param {NeuralNetwork} [brain] Cerveau hérité ou cloné
+     * @param {number} [numRays=NUM_RAYS] Nombre de rayons capteurs
+     */
+    constructor(brain, numRays = NUM_RAYS) {
+        this.numRays = Math.max(3, parseInt(numRays) || 5);
+        this.maxSpeed = GAME_SPEED_LIMIT;
+        this.maxForce = CAR_MAX_FORCE;
 
-        this.width = 10;
-        this.height = 20;
-        this.maxForce = 0.5; // Augmenté pour mieux tourner à haute vitesse
+        // Position de départ avec légère variation
+        this.pos = (typeof createVector === 'function')
+            ? createVector(startX + (Math.random() * 6 - 3), startY + (Math.random() * 6 - 3))
+            : { x: startX, y: startY };
 
+        // Impulsion initiale dans l'axe de la piste
+        let angle = (typeof window !== 'undefined' && window.startAngle) ? window.startAngle : 0;
+        if (typeof p5 !== 'undefined' && p5.Vector && p5.Vector.fromAngle) {
+            this.vel = p5.Vector.fromAngle(angle).mult(CAR_START_IMPULSE);
+            this.acc = createVector(0, 0);
+            this.startPos = this.pos.copy();
+            this.prevPos = this.pos.copy();
+        } else {
+            this.vel = { x: Math.cos(angle) * CAR_START_IMPULSE, y: Math.sin(angle) * CAR_START_IMPULSE };
+            this.acc = { x: 0, y: 0 };
+            this.startPos = { ...this.pos };
+            this.prevPos = { ...this.pos };
+        }
+
+        // Dimensions du châssis
+        this.width = 12;
+        this.height = 24;
+        this.r = 12;
+
+        // États de vie et télémétrie
         this.dead = false;
-        this.finished = false; // A-t-elle terminé le circuit ?
-        this.score = 0;       // Score pur (temps)
-        this.fitness = 0;     // Score calculé
+        this.finished = false;
+        this.score = 0;
+        this.fitness = 0;
+        this.checkpointIndex = (typeof window !== 'undefined' && window.startCheckpointIndex) ? window.startCheckpointIndex : 0;
+        this.wrongWayCount = 0;
+        this.laps = 0;
+        this.frameCount = 0;
+        this.lapStartTime = 0;
+        this.bestLapTime = null;
 
-        this.checkpointIndex = window.startCheckpointIndex || 0; // Prochain checkpoint à valider
-        this.wrongWayCount = 0;   // Détection de sens inverse
-        this.laps = 0;            // Nombre de tours
-        this.frameCount = 0; // Cycle de vie
-        this.startPos = this.pos.copy();
-
-        // Nouveaux compteurs pour anti-camping
+        // Anti-camping et détection d'enlisement
         this.framesStalled = 0;
         this.framesSinceLastCheckpoint = 0;
-        this.prevPos = this.pos.copy(); // Pour détecter les rotations sur place
         this.framesMovingSlowly = 0;
+        this.isBraking = false;
+        this.isAccelerating = false;
 
+        // Historique de traînée pour les dérapages / trace de gomme
+        this.skidHistory = [];
+
+        // Réseau de neurones
+        const topology = getTopology(this.numRays);
         if (brain) {
             this.brain = brain.copy();
         } else {
-            this.brain = new NeuralNetwork(NB_ASSETS, 20, 2);
+            this.brain = new NeuralNetwork(topology);
         }
 
+        // Initialisation des rayons lasers
         this.rays = [];
-        for (let i = 0; i < NB_ASSETS - 1; i++) {
-            this.rays[i] = new Ray();
+        for (let i = 0; i < this.numRays; i++) {
+            this.rays.push(new Ray(this.pos, 0));
         }
     }
 
     dispose() {
-        this.brain.dispose();
+        if (this.brain && typeof this.brain.dispose === 'function') {
+            this.brain.dispose();
+        }
     }
 
-    mutate(rate) {
-        this.brain.mutate(rate);
+    mutate(rate, amount = MUTATION_AMOUNT) {
+        if (this.brain) {
+            this.brain.mutate(rate, amount);
+        }
     }
 
     applyForce(force) {
-        this.acc.add(force);
+        if (!force) return;
+        if (typeof this.acc.add === 'function') {
+            this.acc.add(force);
+        } else {
+            this.acc.x += force.x || 0;
+            this.acc.y += force.y || 0;
+        }
     }
 
     update() {
         if (this.dead) return;
 
         this.frameCount++;
+        this.maxSpeed = GAME_SPEED_LIMIT;
+        this.maxForce = CAR_MAX_FORCE;
 
-        // COUP DE POUCE RADICAL : Si après 60 frames (1s) on n'a tjs pas bougé de 40px
+        // Vérification anti-blocage au départ (60 frames = ~1 sec)
         if (this.frameCount === 60) {
-            if (p5.Vector.dist(this.pos, this.startPos) < 40) {
+            let distStart = (typeof p5 !== 'undefined' && p5.Vector)
+                ? p5.Vector.dist(this.pos, this.startPos)
+                : Math.hypot(this.pos.x - this.startPos.x, this.pos.y - this.startPos.y);
+            if (distStart < 35) {
                 this.dead = true;
                 return;
             }
         }
 
-        this.vel.add(this.acc);
-        this.vel.limit(GAME_SPEED_LIMIT);
-        this.pos.add(this.vel);
-        this.acc.mult(0);
+        // Intégration de la locomotion (Euler)
+        if (typeof this.vel.add === 'function') {
+            let prevSpd = this.vel.mag();
+            this.vel.add(this.acc);
+            this.vel.limit(this.maxSpeed);
+            let curSpd = this.vel.mag();
 
-        // On perd de la vie à chaque frame pour forcer à aller vite (optionnel)
-        // Ici on utilise simplement le franchissement de checkpoints
+            this.isBraking = curSpd < prevSpd - 0.15;
+            this.isAccelerating = curSpd > prevSpd + 0.1;
 
-        // ANTI-CAMPING : On vérifie si la voiture progresse vraiment
-        // Même si elle a de la vitesse, si elle tourne en rond elle n'avancera pas
+            this.pos.add(this.vel);
+            this.acc.mult(0);
+        } else {
+            this.vel.x += this.acc.x;
+            this.vel.y += this.acc.y;
+            const mag = Math.hypot(this.vel.x, this.vel.y);
+            if (mag > this.maxSpeed) {
+                this.vel.x = (this.vel.x / mag) * this.maxSpeed;
+                this.vel.y = (this.vel.y / mag) * this.maxSpeed;
+            }
+            this.pos.x += this.vel.x;
+            this.pos.y += this.vel.y;
+            this.acc.x = 0;
+            this.acc.y = 0;
+        }
 
+        // Gestion de la traînée de dérapage
+        if (this.frameCount % 4 === 0 && !this.dead) {
+            let curPos = (typeof this.pos.copy === 'function') ? this.pos.copy() : { x: this.pos.x, y: this.pos.y };
+            this.skidHistory.push(curPos);
+            if (this.skidHistory.length > 10) this.skidHistory.shift();
+        }
+
+        // Anti-camping : sanctionne les toupies et véhicules tournant sur place
         this.framesMovingSlowly++;
         if (this.framesMovingSlowly > 60) {
-            let distMoved = p5.Vector.dist(this.pos, this.prevPos);
-            if (distMoved < 20) { // Moins de 20px en 1 seconde = sur place ou toupie
+            let distMoved = (typeof p5 !== 'undefined' && p5.Vector)
+                ? p5.Vector.dist(this.pos, this.prevPos)
+                : Math.hypot(this.pos.x - this.prevPos.x, this.pos.y - this.prevPos.y);
+
+            if (distMoved < 22) {
                 this.framesStalled += 60;
             } else {
                 this.framesStalled = 0;
-                this.prevPos = this.pos.copy();
+                this.prevPos = (typeof this.pos.copy === 'function') ? this.pos.copy() : { ...this.pos };
             }
             this.framesMovingSlowly = 0;
         }
 
         this.framesSinceLastCheckpoint++;
 
-        // Si bloqué 120 frames (~2s cumulées) ou pas de checkpoint en 1200 frames (~20s)
-        if (this.framesStalled > 120 || this.framesSinceLastCheckpoint > 1200) {
+        // Élimination des voitures coincées plus de 2.5s ou sans checkpoint en 15s
+        if (this.framesStalled > 150 || this.framesSinceLastCheckpoint > 900) {
             this.dead = true;
         }
     }
 
     checkCheckpoints(cps) {
-        if (this.dead || cps.length === 0) return;
+        if (this.dead || !cps || cps.length === 0) return;
 
-        // 1. DÉTECTION SENS INVERSE (Anti-Triche Vérotielle)
-        // On compare le vecteur vitesse de la voiture avec la direction théorique du circuit
-        if (this.frameCount > 100 && this.vel.mag() > 0.5) {
-            let cp1 = cps[this.checkpointIndex];
+        let curVelMag = (typeof this.vel.mag === 'function') ? this.vel.mag() : Math.hypot(this.vel.x, this.vel.y);
+
+        // Détection de contresens strict
+        if (this.frameCount > 70 && curVelMag > 0.8) {
+            let cp1 = cps[this.checkpointIndex % cps.length];
             let cp2 = cps[(this.checkpointIndex + 1) % cps.length];
 
-            // Calcul du milieu des segments pour obtenir le vecteur direction du circuit
-            let center1 = createVector((cp1.a.x + cp1.b.x) / 2, (cp1.a.y + cp1.b.y) / 2);
-            let center2 = createVector((cp2.a.x + cp2.b.x) / 2, (cp2.a.y + cp2.b.y) / 2);
-            let trackDir = p5.Vector.sub(center2, center1).normalize();
+            if (cp1 && cp2 && typeof p5 !== 'undefined' && p5.Vector) {
+                let center1 = createVector((cp1.a.x + cp1.b.x) / 2, (cp1.a.y + cp1.b.y) / 2);
+                let center2 = createVector((cp2.a.x + cp2.b.x) / 2, (cp2.a.y + cp2.b.y) / 2);
+                let trackDir = p5.Vector.sub(center2, center1).normalize();
 
-            // Si le produit scalaire est négatif, la voiture va à l'envers
-            if (this.vel.dot(trackDir) < -0.3) {
-                this.wrongWayCount++;
-                if (this.wrongWayCount > 100) { // Environ 1.6s à l'envers cumulées
-                    this.dead = true;
-                    return;
+                if (this.vel.dot(trackDir) < -0.3) {
+                    this.wrongWayCount++;
+                    if (this.wrongWayCount > 80) {
+                        this.dead = true;
+                        return;
+                    }
+                } else if (this.vel.dot(trackDir) > 0.2) {
+                    this.wrongWayCount = Math.max(0, this.wrongWayCount - 4);
                 }
-            } else if (this.vel.dot(trackDir) > 0.2) {
-                this.wrongWayCount = max(0, this.wrongWayCount - 5); // Remontée rapide si on va dans le bon sens
             }
         }
 
-        // 2. PROGRESSION NORMALE
-        let goal = cps[this.checkpointIndex];
-        let d = distPointToSegment(this.pos, goal.a, goal.b);
+        // Franchissement de checkpoint
+        let goal = cps[this.checkpointIndex % cps.length];
+        if (!goal) return;
 
-        if (d < 40) {
+        let d = (typeof distPointToSegment === 'function')
+            ? distPointToSegment(this.pos, goal.a, goal.b)
+            : Math.hypot(this.pos.x - (goal.a.x + goal.b.x) / 2, this.pos.y - (goal.a.y + goal.b.y) / 2);
+
+        if (d < 45) {
             this.checkpointIndex = (this.checkpointIndex + 1) % cps.length;
-            this.score += 50;
+            this.score += 60;
             this.framesSinceLastCheckpoint = 0;
-            this.wrongWayCount = 0; // Reset si on avance bien
+            this.wrongWayCount = 0;
 
+            // Bouclage d'un tour complet !
             if (this.checkpointIndex === 0) {
                 this.laps++;
-                this.score += 200;
+                this.score += 300;
+                let lapTime = (this.frameCount - this.lapStartTime) / 60;
+                this.lapStartTime = this.frameCount;
+                if (!this.bestLapTime || lapTime < this.bestLapTime) {
+                    this.bestLapTime = lapTime;
+                }
+                if (!bestLapTimeRecord || lapTime < bestLapTimeRecord) {
+                    bestLapTimeRecord = lapTime;
+                }
                 this.finished = true;
                 this.dead = true;
             }
@@ -144,103 +233,235 @@ class Car {
 
     look(walls) {
         const inputs = [];
-        let heading = this.vel.heading();
+        let heading = (typeof this.vel.heading === 'function')
+            ? this.vel.heading()
+            : Math.atan2(this.vel.y, this.vel.x);
 
-        // On a NB_ASSETS - 1 rayons (5 rayons)
-        let numRays = NB_ASSETS - 1;
+        const nRays = this.numRays;
 
-        for (let i = 0; i < numRays; i++) {
-            let angle = heading - FOV / 2 + (i * FOV) / (numRays - 1);
-            if (numRays === 1) angle = heading;
+        for (let i = 0; i < nRays; i++) {
+            let angle = (nRays === 1)
+                ? heading
+                : heading - FOV / 2 + (i * FOV) / (nRays - 1);
 
-            this.rays[i].setDir(angle);
-            this.rays[i].setPos(this.pos.x, this.pos.y);
+            let ray = this.rays[i];
+            if (!ray) {
+                ray = new Ray(this.pos, angle);
+                this.rays[i] = ray;
+            }
+
+            ray.setDir(angle);
+            ray.setPos(this.pos.x, this.pos.y);
 
             let closest = null;
             let record = SIGHT_DIST;
 
-            for (let wall of walls) {
-                const pt = this.rays[i].cast(wall);
-                if (pt) {
-                    const d = p5.Vector.dist(this.pos, pt);
-                    if (d < record) {
-                        record = d;
-                        closest = pt;
+            if (walls && walls.length > 0) {
+                for (let wall of walls) {
+                    const pt = ray.cast(wall);
+                    if (pt) {
+                        let d = (typeof p5 !== 'undefined' && p5.Vector)
+                            ? p5.Vector.dist(this.pos, pt)
+                            : Math.hypot(this.pos.x - pt.x, this.pos.y - pt.y);
+                        if (d < record) {
+                            record = d;
+                            closest = pt;
+                        }
                     }
                 }
             }
 
-            inputs[i] = map(record, 0, SIGHT_DIST, 1, 0);
-            this.rays[i].end = closest;
+            // Normalisation de l'entrée : 1 quand tout proche du mur, 0 quand libre à portée max
+            inputs[i] = (typeof map === 'function')
+                ? map(record, 0, SIGHT_DIST, 1, 0)
+                : Math.max(0, Math.min(1, 1 - record / SIGHT_DIST));
+
+            ray.end = closest;
+            ray.hitFraction = record / SIGHT_DIST; // 0 = contact, 1 = dégagé
         }
 
-        // Le dernier input est la vitesse normalisée
-        inputs[NB_ASSETS - 1] = map(this.vel.mag(), 0, GAME_SPEED_LIMIT, 0, 1);
+        // Dernière entrée : Vitesse actuelle normalisée
+        let speedMag = (typeof this.vel.mag === 'function') ? this.vel.mag() : Math.hypot(this.vel.x, this.vel.y);
+        inputs[nRays] = (typeof map === 'function')
+            ? map(speedMag, 0, Math.max(1, this.maxSpeed), 0, 1)
+            : Math.max(0, Math.min(1, speedMag / Math.max(1, this.maxSpeed)));
 
         return inputs;
     }
 
     think(walls) {
+        if (this.dead) return;
+
         let inputs = this.look(walls);
         let outputs = this.brain.predict(inputs);
 
-        let turnForce = map(outputs[0], 0, 1, -this.maxForce, this.maxForce);
-        let thrust = map(outputs[1], 0, 1, 0, GAME_SPEED_LIMIT);
+        let turnRatio = outputs[0] || 0.5;
+        let thrustRatio = outputs[1] || 0.5;
 
-        // AIDE AU DÉMARRAGE : Première demi-seconde, on pousse forcément un peu
-        if (this.frameCount < 30) {
-            thrust = max(thrust, GAME_SPEED_LIMIT * 0.5);
+        // Force de braquage et puissance d'accélération
+        let turnForce = (typeof map === 'function')
+            ? map(turnRatio, 0, 1, -this.maxForce, this.maxForce)
+            : (-this.maxForce + turnRatio * (2 * this.maxForce));
+
+        let thrust = (typeof map === 'function')
+            ? map(thrustRatio, 0, 1, 0, this.maxSpeed)
+            : (thrustRatio * this.maxSpeed);
+
+        // Boost d'aide au premier quart de seconde
+        if (this.frameCount < 25) {
+            thrust = Math.max(thrust, this.maxSpeed * 0.6);
         }
 
-        let currentHeading = this.vel.heading();
-        let desiredHeading = currentHeading + turnForce;
-        let desiredVel = p5.Vector.fromAngle(desiredHeading);
-        desiredVel.setMag(thrust);
+        if (typeof p5 !== 'undefined' && p5.Vector && typeof this.vel.heading === 'function') {
+            let currentHeading = this.vel.heading();
+            let desiredHeading = currentHeading + turnForce;
+            let desiredVel = p5.Vector.fromAngle(desiredHeading).setMag(thrust);
 
-        let steer = p5.Vector.sub(desiredVel, this.vel);
-        steer.limit(this.maxForce);
-
-        this.applyForce(steer);
+            let steer = p5.Vector.sub(desiredVel, this.vel);
+            steer.limit(this.maxForce);
+            this.applyForce(steer);
+        } else {
+            let currentHeading = Math.atan2(this.vel.y, this.vel.x);
+            let desiredHeading = currentHeading + turnForce;
+            let dvx = Math.cos(desiredHeading) * thrust;
+            let dvy = Math.sin(desiredHeading) * thrust;
+            let sx = dvx - this.vel.x;
+            let sy = dvy - this.vel.y;
+            let smag = Math.hypot(sx, sy);
+            if (smag > this.maxForce) {
+                sx = (sx / smag) * this.maxForce;
+                sy = (sy / smag) * this.maxForce;
+            }
+            this.applyForce({ x: sx, y: sy });
+        }
     }
 
-    show(isBest) {
-        if (this.dead && !isBest) return; // Cache les morts sauf le meilleur passée
+    show(isBest, isDebug = DEBUG_MODE) {
+        if (typeof push !== 'function') return;
+        if (this.dead && !isBest && !isDebug) return;
 
+        // 1. Dessin des rayons lasers avec dégradés luminescents
+        if (!this.dead || isBest) {
+            for (let r of this.rays) {
+                if (r.end) {
+                    let hit = r.hitFraction; // 0 = proche, 1 = loin
+                    if (isBest) {
+                        // Couleurs dynamiques selon proximité du danger
+                        if (hit < 0.3) {
+                            stroke(255, 40, 80, 220); // Rouge critique
+                            strokeWeight(1.8);
+                        } else if (hit < 0.65) {
+                            stroke(255, 200, 30, 180); // Ambre avertissement
+                            strokeWeight(1.2);
+                        } else {
+                            stroke(0, 255, 180, 140); // Vert / Cyan voie dégagée
+                            strokeWeight(0.9);
+                        }
+                    } else {
+                        stroke(255, 255, 255, isDebug ? 60 : 25);
+                        strokeWeight(0.6);
+                    }
+
+                    line(this.pos.x, this.pos.y, r.end.x, r.end.y);
+
+                    // Étincelle à l'impact pour le leader
+                    if (isBest) {
+                        noStroke();
+                        fill(hit < 0.3 ? color(255, 50, 50, 240) : color(255, 230, 80, 200));
+                        circle(r.end.x, r.end.y, hit < 0.3 ? 5 : 3.5);
+                    }
+                }
+            }
+        }
+
+        // 2. Traînée de dérapage sur l'asphalte
+        if (this.skidHistory.length > 1) {
+            noFill();
+            stroke(isBest ? color(0, 255, 200, 40) : color(255, 255, 255, 15));
+            strokeWeight(isBest ? 3 : 1.5);
+            beginShape();
+            for (let pt of this.skidHistory) {
+                vertex(pt.x, pt.y);
+            }
+            endShape();
+        }
+
+        // 3. Dessin de la carrosserie de course (Châssis Supercar Aérodynamique)
         push();
         translate(this.pos.x, this.pos.y);
         rotate(this.vel.heading());
         rectMode(CENTER);
 
+        // Lueur néon sous le châssis (Underglow)
         if (isBest) {
-            fill(0, 255, 0); // Vert pour le meilleur
-            stroke(0, 255, 0);
-        } else {
-            fill(255, 50); // Blanc transparent pour les autres
-            stroke(255, 100);
+            noStroke();
+            fill(0, 255, 180, 60);
+            ellipse(0, 0, this.height * 1.5, this.width * 1.8);
         }
 
-        if (this.dead) fill(255, 0, 0, 100); // Rouge si mort (mais affiché)
+        // Châssis principal
+        let bodyColor = isBest ? color(16, 185, 129) : (this.dead ? color(220, 38, 38, 90) : color(56, 189, 248, 120));
+        let accentColor = isBest ? color(245, 158, 11) : color(255, 255, 255, 180);
 
-        rect(0, 0, this.height, this.width);
+        // Roues sportives noires
+        fill(20);
+        stroke(bodyColor);
+        strokeWeight(1);
+        rect(-this.height * 0.32, -this.width * 0.55, 5, 2.5, 1);
+        rect(-this.height * 0.32, this.width * 0.55, 5, 2.5, 1);
+        rect(this.height * 0.32, -this.width * 0.55, 5, 2.5, 1);
+        rect(this.height * 0.32, this.width * 0.55, 5, 2.5, 1);
+
+        // Corps profilé
+        fill(bodyColor);
+        stroke(isBest ? color(255, 255, 255, 240) : color(255, 255, 255, 70));
+        strokeWeight(isBest ? 1.5 : 1);
+        rect(0, 0, this.height, this.width, 3);
+
+        // Cockpit teinté
+        fill(15, 23, 42, 220);
+        stroke(accentColor);
+        strokeWeight(1);
+        rect(-this.height * 0.05, 0, this.height * 0.45, this.width * 0.65, 2);
+
+        // Aileron arrière (Spoiler)
+        fill(25);
+        stroke(bodyColor);
+        rect(-this.height * 0.48, 0, 3, this.width * 1.15, 1);
+
+        // Phares avant LED
+        noStroke();
+        fill(255, 255, 255, 240);
+        circle(this.height * 0.45, -this.width * 0.32, 2.5);
+        circle(this.height * 0.45, this.width * 0.32, 2.5);
+
+        // Feux stop arrière (rouges vifs en freinage)
+        fill(this.isBraking ? color(255, 0, 0, 255) : color(180, 0, 0, 150));
+        circle(-this.height * 0.48, -this.width * 0.3, this.isBraking ? 3 : 2);
+        circle(-this.height * 0.48, this.width * 0.3, this.isBraking ? 3 : 2);
+
+        // Flamme d'échappement en forte accélération
+        let curMag = this.vel.mag();
+        if (curMag > this.maxSpeed * 0.75 && !this.dead) {
+            fill(isBest ? color(56, 189, 248, 220) : color(249, 115, 22, 200));
+            triangle(-this.height * 0.5, -2, -this.height * 0.5, 2, -this.height * 0.5 - random(4, 9), 0);
+        }
+
         pop();
 
-        // Dessin des rayons
-        // On dessine maintenant pour tout le monde, mais plus discret pour les non-best
-        if (!this.dead) {
-            for (let r of this.rays) {
-                if (r.end) {
-                    if (isBest) {
-                        stroke(255, 255, 0, 150); // Jaune vif pour le leader
-                        strokeWeight(1);
-                    } else {
-                        stroke(255, 255, 255, 20); // Gris très transparent pour les autres
-                        strokeWeight(0.5);
-                    }
-                    line(this.pos.x, this.pos.y, r.end.x, r.end.y);
-                }
-            }
+        // 4. Debug information (vecteurs de force, rayon de détection)
+        if (isDebug) {
+            push();
+            noFill();
+            stroke(255, 200, 0, 120);
+            circle(this.pos.x, this.pos.y, this.r * 2);
+            stroke(0, 180, 255, 200);
+            line(this.pos.x, this.pos.y, this.pos.x + this.vel.x * 5, this.pos.y + this.vel.y * 5);
+            pop();
         }
-        strokeWeight(1);
     }
 }
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { Car };
+}

@@ -66,17 +66,9 @@ class MotoSquad extends Vehicle {
    * - Leader : follow(path) + separate(allVehicles)
    * - Suiveurs : arrive(motoDevant) + separate(allVehicles)
    */
-  applyBehaviors(vehicles, path, particles = null) {
+  applyBehaviors(vehicles, path, particles = null, obstacles = []) {
     // 1. Leader
-    let fFollow = this.leader.follow(path);
-    let sLeader = this.leader.separate(vehicles);
-
-    fFollow.mult(this.followPathWeight);
-    sLeader.mult(this.separateWeight);
-
-    this.leader.applyForce(fFollow);
-    this.leader.applyForce(sLeader);
-    this.leader.applyBehaviors(vehicles, path, particles); // Pour le lean et les particules
+    this.leader.applyBehaviors(vehicles, path, particles, obstacles); // Forces, inclinaison et particules
     this.leader.update();
 
     this.pos = this.leader.pos.copy();
@@ -88,13 +80,7 @@ class MotoSquad extends Vehicle {
       let motoDevant = this.motos[i - 1];
 
       let fArrive = moto.arrive(motoDevant.pos, this.draftDistance, 70);
-      let sMoto = moto.separate(vehicles);
-
-      sMoto.mult(this.separateWeight);
-
-      moto.applyForce(fArrive);
-      moto.applyForce(sMoto);
-      moto.applyBehaviors(vehicles, path, particles);
+      moto.applyBehaviors(vehicles, path, particles, obstacles, fArrive);
       moto.update();
     }
   }

@@ -24,6 +24,10 @@ let motos = [];
 let squads = [];
 let vehicles = [];
 let particles = [];
+let trackObstacles = [];
+let simulationPaused = false;
+let obstaclePlacementArmed = false;
+let obstacleEraseMode = false;
 
 // Paramètres de pilotage
 let followPathWeight = 2.2;
@@ -37,6 +41,9 @@ let sliderFollow, valFollow;
 let sliderSeparate, valSeparate;
 let sliderSpeed, valSpeed;
 let btnAddMoto, btnAddSquad, btnKlaxon, btnNitro, btnAudio, btnDebug, btnNextLevel, btnClear;
+let btnPause, btnReset, btnAddObstacle, sliderDetection, valDetection, sliderVolume, valVolume;
+let selectRacer, selectDrivingStyle, sliderRacerSpeed, sliderForce, sliderPrecision;
+let selectedRacerIndex = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -62,18 +69,26 @@ function draw() {
 
   // 2. Rendu de la piste de course asphaltée avec vibreurs et ligne de départ
   drawRacetrack(path, level);
+  for (const obstacle of trackObstacles) obstacle.render();
+  if (simulationPaused) {
+    for (const v of vehicles) v.render();
+    for (const m of motos) m.render(debug);
+    for (const squad of squads) squad.render(debug);
+    if (debug) drawDebugOverlay(motos.length + squads.reduce((n, sq) => n + sq.getBikes().length, 0));
+    return;
+  }
 
   // 3. Regroupement de toutes les motos pour la séparation mutuelle
   let allBikes = [...motos];
   for (let sq of squads) {
     allBikes.push(...sq.getBikes());
   }
-  let allObstacles = [...vehicles, ...allBikes];
+  let otherRacers = [...vehicles, ...allBikes];
 
   // 4. Mise à jour des voitures de sécurité / pace cars
   for (let i = vehicles.length - 1; i >= 0; i--) {
     let v = vehicles[i];
-    v.applyBehaviors(allObstacles, path);
+    v.applyBehaviors(otherRacers, path);
     v.run();
   }
 
@@ -88,8 +103,8 @@ function draw() {
     m.followPathWeight = followPathWeight;
     m.separateWeight = separateWeight;
 
-    let otherEntities = allObstacles.filter((b) => b !== m);
-    m.applyBehaviors(otherEntities, path, particles);
+    let otherEntities = otherRacers.filter((b) => b !== m);
+    m.applyBehaviors(otherEntities, path, particles, trackObstacles);
     m.update();
     m.render(debug);
 
@@ -110,8 +125,8 @@ function draw() {
   // 7. Mise à jour des écuries en aspiration (MotoSquad)
   for (let sq of squads) {
     sq.setWeights(followPathWeight, separateWeight);
-    let otherEntities = allObstacles.filter((b) => !sq.getBikes().includes(b));
-    sq.applyBehaviors(otherEntities, path, particles);
+    let otherEntities = otherRacers.filter((b) => !sq.getBikes().includes(b));
+    sq.applyBehaviors(otherEntities, path, particles, trackObstacles);
     sq.render(debug);
 
     for (let b of sq.getBikes()) {
@@ -207,6 +222,7 @@ function spawnInitialRacers() {
     v.r = 12;
     vehicles.push(v);
   }
+  refreshRacerOptions();
 }
 
 /**
@@ -229,6 +245,7 @@ function addMoto(x, y) {
   m.followPathWeight = followPathWeight;
   m.separateWeight = separateWeight;
   motos.push(m);
+  refreshRacerOptions();
 
   // Petit coup de gaz sonore à l'arrivée d'une moto
   if (motoAudio) motoAudio.playBackfire();
@@ -253,6 +270,7 @@ function addMotoSquad(x, y) {
   let squad = new MotoSquad(posX, posY, 3, null, motoBaseSpeed);
   squad.setWeights(followPathWeight, separateWeight);
   squads.push(squad);
+  refreshRacerOptions();
   return squad;
 }
 
@@ -386,6 +404,13 @@ function bindUIControls() {
   btnDebug = document.getElementById('btn-debug');
   btnNextLevel = document.getElementById('btn-next-level');
   btnClear = document.getElementById('btn-clear');
+  btnPause = document.getElementById('btn-pause');
+  btnReset = document.getElementById('btn-reset');
+  btnAddObstacle = document.getElementById('btn-add-obstacle');
+  sliderDetection = document.getElementById('slider-detection');
+  valDetection = document.getElementById('val-detection');
+  sliderVolume = document.getElementById('slider-volume');
+  valVolume = document.getElementById('val-volume');
 
   if (selectLevel) {
     selectLevel.addEventListener('change', () => {
@@ -415,6 +440,19 @@ function bindUIControls() {
       for (let sq of squads) sq.setSpeed(motoBaseSpeed);
     });
   }
+
+  if (sliderDetection) sliderDetection.addEventListener('input', () => {
+    const distance = Number(sliderDetection.value);
+    if (valDetection) valDetection.textContent = `${distance}px`;
+    const racer = getAllRacers()[selectedRacerIndex];
+    if (racer) racer.configure({ detectionDistance: distance });
+  });
+
+  if (sliderVolume) sliderVolume.addEventListener('input', () => {
+    const volume = Number(sliderVolume.value);
+    if (valVolume) valVolume.textContent = `${Math.round(volume * 100)}%`;
+    if (motoAudio) motoAudio.setVolume(volume);
+  });
 
   if (btnAddMoto) {
     btnAddMoto.addEventListener('click', () => addMoto(mouseX, mouseY));
@@ -464,6 +502,116 @@ function bindUIControls() {
       particles = [];
     });
   }
+  if (btnPause) btnPause.addEventListener('click', togglePause);
+  if (btnReset) btnReset.addEventListener('click', resetRace);
+  if (btnAddObstacle) btnAddObstacle.addEventListener('click', () => {
+    obstacleEraseMode = false;
+    obstaclePlacementArmed = true;
+    btnAddObstacle.textContent = 'Cliquez sur la piste…';
+    const removeButton = document.getElementById('btn-remove-obstacle');
+    if (removeButton) removeButton.textContent = 'Supprimer obstacle [X]';
+  });
+  const btnRemoveObstacle = document.getElementById('btn-remove-obstacle');
+  if (btnRemoveObstacle) btnRemoveObstacle.addEventListener('click', toggleObstacleEraseMode);
+
+  selectRacer = document.getElementById('select-racer');
+  selectDrivingStyle = document.getElementById('select-driving-style');
+  sliderRacerSpeed = document.getElementById('slider-racer-speed');
+  sliderForce = document.getElementById('slider-force');
+  sliderPrecision = document.getElementById('slider-precision');
+  if (selectRacer) selectRacer.addEventListener('change', () => {
+    selectedRacerIndex = Number(selectRacer.value) || 0;
+    syncRacerControls();
+  });
+  if (selectDrivingStyle) selectDrivingStyle.addEventListener('change', () => {
+    const racer = getAllRacers()[selectedRacerIndex];
+    if (racer) racer.configure({ drivingStyle: selectDrivingStyle.value });
+  });
+  if (sliderRacerSpeed) sliderRacerSpeed.addEventListener('input', () => {
+    const value = Number(sliderRacerSpeed.value);
+    const racer = getAllRacers()[selectedRacerIndex];
+    if (racer) racer.configure({ maxSpeed: value });
+    if (document.getElementById('val-racer-speed')) document.getElementById('val-racer-speed').textContent = value.toFixed(1);
+  });
+  if (sliderForce) sliderForce.addEventListener('input', () => {
+    const value = Number(sliderForce.value);
+    const racer = getAllRacers()[selectedRacerIndex];
+    if (racer) racer.configure({ maxForce: value });
+    if (document.getElementById('val-force')) document.getElementById('val-force').textContent = value.toFixed(2);
+  });
+  if (sliderPrecision) sliderPrecision.addEventListener('input', () => {
+    const value = Number(sliderPrecision.value);
+    const racer = getAllRacers()[selectedRacerIndex];
+    if (racer) racer.configure({ followPrecision: value });
+    if (document.getElementById('val-precision')) document.getElementById('val-precision').textContent = value.toFixed(2);
+  });
+}
+
+function getAllRacers() {
+  return [...motos, ...squads.flatMap((squad) => squad.getBikes())];
+}
+
+function refreshRacerOptions() {
+  if (!selectRacer) return;
+  const racers = getAllRacers();
+  const previous = Math.min(selectedRacerIndex, Math.max(0, racers.length - 1));
+  selectRacer.replaceChildren();
+  racers.forEach((racer, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = `Moto #${racer.number}`;
+    selectRacer.appendChild(option);
+  });
+  selectedRacerIndex = previous;
+  selectRacer.value = String(previous);
+  syncRacerControls();
+}
+
+function syncRacerControls() {
+  const racer = getAllRacers()[selectedRacerIndex];
+  if (!racer) return;
+  if (sliderDetection) sliderDetection.value = racer.obstacleDetectionDistance;
+  if (valDetection) valDetection.textContent = `${racer.obstacleDetectionDistance}px`;
+  if (sliderRacerSpeed) sliderRacerSpeed.value = racer.originalMaxSpeed;
+  if (sliderForce) sliderForce.value = racer.originalMaxForce;
+  if (sliderPrecision) sliderPrecision.value = racer.followPrecision;
+  if (selectDrivingStyle) selectDrivingStyle.value = racer.drivingStyle;
+  const speedOutput = document.getElementById('val-racer-speed');
+  const forceOutput = document.getElementById('val-force');
+  const precisionOutput = document.getElementById('val-precision');
+  if (speedOutput) speedOutput.textContent = Number(racer.originalMaxSpeed).toFixed(1);
+  if (forceOutput) forceOutput.textContent = Number(racer.originalMaxForce).toFixed(2);
+  if (precisionOutput) precisionOutput.textContent = Number(racer.followPrecision).toFixed(2);
+}
+
+function addTrackObstacle(x, y) {
+  const px = Number.isFinite(x) ? x : width / 2;
+  const py = Number.isFinite(y) ? y : height / 2;
+  trackObstacles.push(new TrackObstacle(px, py, random(18, 34)));
+}
+
+function toggleObstacleEraseMode() {
+  obstacleEraseMode = !obstacleEraseMode;
+  obstaclePlacementArmed = false;
+  if (btnAddObstacle) btnAddObstacle.textContent = '+ Obstacle [O]';
+  const button = document.getElementById('btn-remove-obstacle');
+  if (button) button.textContent = obstacleEraseMode ? 'Cliquez sur un obstacle…' : 'Supprimer obstacle [X]';
+}
+
+function togglePause() {
+  simulationPaused = !simulationPaused;
+  if (btnPause) btnPause.textContent = simulationPaused ? '▶ Reprendre' : '⏸ Pause';
+}
+
+function resetRace() {
+  simulationPaused = false;
+  trackObstacles = [];
+  if (btnPause) btnPause.textContent = '⏸ Pause';
+  obstacleEraseMode = false;
+  obstaclePlacementArmed = false;
+  const removeButton = document.getElementById('btn-remove-obstacle');
+  if (removeButton) removeButton.textContent = 'Supprimer obstacle [X]';
+  spawnInitialRacers();
 }
 
 /**
@@ -526,6 +674,14 @@ function keyPressed(event) {
     toggleDebug();
   } else if (key === 'n' || key === 'N') {
     loadLevel(currentLevelIndex + 1);
+  } else if (key === 'p' || key === 'P') {
+    togglePause();
+  } else if (key === 'r' || key === 'R') {
+    resetRace();
+  } else if (key === 'o' || key === 'O') {
+    addTrackObstacle(mouseX, mouseY);
+  } else if (key === 'x' || key === 'X') {
+    toggleObstacleEraseMode();
   } else if (key === 's' || key === 'S') {
     addMotoSquad(mouseX, mouseY);
   } else if (key === ' ' || key === 'b' || key === 'B') {
@@ -535,6 +691,23 @@ function keyPressed(event) {
 
 function mousePressed() {
   if (motoAudio) motoAudio.init();
+  const controlsEl = document.getElementById('controls');
+  if (controlsEl && mouseY < controlsEl.offsetHeight + 15) return;
+  if (mouseY > height - 55) return;
+  if (obstacleEraseMode) {
+    const removed = removeTrackObstacleAt(trackObstacles, mouseX, mouseY);
+    if (removed) {
+      obstacleEraseMode = false;
+      const removeButton = document.getElementById('btn-remove-obstacle');
+      if (removeButton) removeButton.textContent = 'Supprimer obstacle [X]';
+    }
+  } else {
+    addTrackObstacle(mouseX, mouseY);
+  }
+  if (obstaclePlacementArmed) {
+    obstaclePlacementArmed = false;
+    if (btnAddObstacle) btnAddObstacle.textContent = '+ Obstacle [O]';
+  }
 }
 
 function mouseDragged() {

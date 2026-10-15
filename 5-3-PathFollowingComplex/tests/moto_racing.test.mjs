@@ -53,6 +53,7 @@ class Vec2 {
     return this;
   }
   mag() { return Math.sqrt(this.x ** 2 + this.y ** 2); }
+  magSq() { return this.x ** 2 + this.y ** 2; }
   normalize() {
     let m = this.mag();
     if (m !== 0) this.div(m);
@@ -113,6 +114,7 @@ global.BOLD = 'bold';
 function loadCode(filename) {
   let code = readFileSync(join(base, filename), 'utf-8');
   code = code.replace(/^class (\w+)/gm, 'globalThis.$1 = class $1');
+  code = code.replace(/^function (\w+)\(/gm, 'globalThis.$1 = function $1(');
   new Function(code)();
 }
 
@@ -181,14 +183,17 @@ global.AudioContext = class {
 global.window = { AudioContext: global.AudioContext };
 
 loadCode('MotoAudio.js');
+loadCode('ObstacleAvoidance.js');
 loadCode('ExhaustParticle.js');
 loadCode('Moto.js');
 loadCode('MotoSquad.js');
+loadCode('TrackObstacle.js');
 
 const MotoAudio = globalThis.MotoAudio;
 const ExhaustParticle = globalThis.ExhaustParticle;
 const Moto = globalThis.Moto;
 const MotoSquad = globalThis.MotoSquad;
+const TrackObstacle = globalThis.TrackObstacle;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TESTS
@@ -203,8 +208,64 @@ describe('5-3 Moto Racing & Circuits Multi-Niveaux', () => {
     assert.ok(moto instanceof Vehicle, 'Moto doit hériter de Vehicle');
     assert.ok(particle instanceof Vehicle, 'ExhaustParticle doit hériter de Vehicle');
     assert.ok(squad instanceof Vehicle, 'MotoSquad doit hériter de Vehicle');
+    assert.ok(new TrackObstacle(300, 300, 24) instanceof Vehicle, 'Obstacle doit hériter de Vehicle');
   });
 
+  describe('Obstacle avoidance', () => {
+    it('detects the nearest obstacle in the forward corridor and caps steering', () => {
+      const moto = new Moto(100, 100, 5, 0.35);
+      moto.vel.set(4, 0);
+      const near = new TrackObstacle(155, 100, 20);
+      const farther = new TrackObstacle(190, 100, 20);
+      const result = obstacleAvoidance(moto, [farther, near], 180);
+      assert.equal(result.obstacle, near);
+      assert.ok(result.force.mag() > 0 && result.force.mag() <= moto.maxForce + 1e-9);
+      assert.ok(result.force.y < 0);
+    });
+
+    it('ignores obstacles beyond range or outside the forward corridor', () => {
+      const moto = new Moto(100, 100, 5, 0.35);
+      moto.vel.set(4, 0);
+      const distant = new TrackObstacle(350, 100, 20);
+      const lateral = new TrackObstacle(150, 180, 20);
+      assert.equal(obstacleAvoidance(moto, [distant, lateral], 120).obstacle, null);
+    });
+
+    it('removes only the obstacle targeted by the click', () => {
+      const first = new TrackObstacle(100, 100, 20);
+      const second = new TrackObstacle(200, 100, 25);
+      const obstacles = [first, second];
+      assert.equal(removeTrackObstacleAt(obstacles, 118, 100), first);
+      assert.deepEqual(obstacles, [second]);
+      assert.equal(removeTrackObstacleAt(obstacles, 140, 100), null);
+      assert.deepEqual(obstacles, [second]);
+    });
+
+    it('anticipates crossing trajectories with fast vehicles', () => {
+      const moto = new Moto(100, 100, 5, 0.35);
+      moto.vel.set(4, 0);
+      const fastCrossingVehicle = new Vehicle(140, 55, 8, 0.5);
+      fastCrossingVehicle.vel.set(0, 5);
+      const result = vehicleCollisionAvoidance(moto, [fastCrossingVehicle], 18);
+      assert.equal(result.vehicle, fastCrossingVehicle);
+      assert.ok(result.time >= 0 && result.time <= 18);
+      assert.ok(result.force.mag() > 0 && result.force.mag() <= moto.maxForce + 1e-9);
+    });
+
+    it('configures per-bike speed, precision, style and detection settings', () => {
+      const moto = new Moto(100, 100, 5, 0.35);
+      moto.vel.set(4, 0);
+      const obstacle = new TrackObstacle(150, 100, 22);
+      moto.configure({ drivingStyle: 'prudent', detectionDistance: 240, followPrecision: 1.4, maxSpeed: 6, maxForce: 0.5 });
+      moto.applyBehaviors([], null, null, [obstacle]);
+      assert.equal(moto.drivingStyle, 'prudent');
+      assert.equal(moto.followPrecision, 1.4);
+      assert.equal(moto.obstacleDetectionDistance, 240);
+      assert.equal(moto.maxSpeed, 6);
+      assert.equal(moto.isAvoidingObstacle, true);
+      assert.ok(moto.acc.mag() <= moto.maxForce + 1e-9);
+    });
+  });
   it('Moto.arrive() ralentit doucement à l\'approche de la cible', () => {
     const moto = new Moto(0, 0, 5, 0.5);
     moto.vel.set(0, 0);

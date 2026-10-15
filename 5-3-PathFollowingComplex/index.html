@@ -16,10 +16,12 @@
 
     <!-- Moteur Audio & Niveaux de circuit & Entités Moto -->
     <script src="MotoAudio.js"></script>
+    <script src="ObstacleAvoidance.js"></script>
     <script src="levels.js"></script>
     <script src="ExhaustParticle.js"></script>
     <script src="Moto.js"></script>
     <script src="MotoSquad.js"></script>
+    <script src="TrackObstacle.js"></script>
 
     <!-- Sketch principal -->
     <script src="sketch.js"></script>
@@ -58,8 +60,46 @@
         <output id="val-speed">4.2</output>
       </div>
 
+      <div class="control-group">
+        <label for="slider-detection">Détection :</label>
+        <input id="slider-detection" type="range" min="40" max="400" step="10" value="170" />
+        <output id="val-detection">170px</output>
+      </div>
+      <div class="control-group">
+        <label for="slider-volume">Volume :</label>
+        <input id="slider-volume" type="range" min="0" max="1" step="0.05" value="0.45" />
+        <output id="val-volume">45%</output>
+      </div>
+      <div class="control-group">
+        <label for="select-racer">Réglages moto :</label>
+        <select id="select-racer"></select>
+        <select id="select-driving-style" aria-label="Style de conduite">
+          <option value="prudent">Prudent</option><option value="normal" selected>Normal</option><option value="aggressive">Agressif</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="slider-racer-speed">Vmax moto :</label>
+        <input id="slider-racer-speed" type="range" min="1" max="10" step="0.5" value="4.2" />
+        <output id="val-racer-speed">4.2</output>
+      </div>
+      <div class="control-group">
+        <label for="slider-force">Accélération :</label>
+        <input id="slider-force" type="range" min="0.1" max="1.5" step="0.05" value="0.45" />
+        <output id="val-force">0.45</output>
+      </div>
+      <div class="control-group">
+        <label for="slider-precision">Précision :</label>
+        <input id="slider-precision" type="range" min="0.25" max="2" step="0.05" value="1" />
+        <output id="val-precision">1.00</output>
+      </div>
+
+
       <!-- Actions Rapides -->
       <div class="control-group">
+        <button id="btn-add-obstacle">+ Obstacle [O]</button>
+        <button id="btn-remove-obstacle">Supprimer obstacle [X]</button>
+        <button id="btn-pause">Pause [P]</button>
+        <button id="btn-reset">Réinitialiser [R]</button>
         <button id="btn-add-moto" class="primary" title="Touche ' (apostrophe)">+ Moto [ ' ]</button>
         <button id="btn-add-squad" title="Touche S">+ Écurie [S]</button>
         <button id="btn-klaxon" class="horn-btn" title="Touche K ou H">📢 Klaxon [K]</button>

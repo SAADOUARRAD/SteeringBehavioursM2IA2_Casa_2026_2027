@@ -15,23 +15,11 @@ class Boid {
     this.maxForce = 0.2;
     this.maxSpeed = 5;
     this.r = 6;
+    this.trail = [];
+    this.trailMaxLength = 28;
 
     // si le boid est une image
-    if (image !== undefined) {
-      this.image = image;
-
-      // largeur image
-      const li = this.image.width;
-      // hauteur image
-      const hi = this.image.height;
-      // on remet les valeurs à l'échelle par rapport au rayon
-      // du véhicule
-      const ratio = li / hi;
-      // la largeur de l'image sera égale à r
-      this.imageL = this.r;
-      // la hauteur de l'image sera égale à r/ratio
-      this.imageH = this.r / ratio;
-    }
+    this.setImage(image);
 
     this.perceptionRadius = 25;
     // pour le comportement align
@@ -66,150 +54,46 @@ class Boid {
 
   // Equivalent de "applyBehaviors" dans le code des autres exemples
   // flock signifie "se rassembler" en anglais
-  flock(boids, obstacles) {
-    let avoid = this.avoid(obstacles);
-    let alignment = this.align(boids);
-    let cohesion = this.cohesion(boids);
-    let separation = this.separation(boids);
-    let boundaries = this.boundaries(this.boundariesX, this.boundariesY, this.boundariesWidth, this.boundariesHeight, this.boundariesDistance);
-    //let boundaries = this.boundaries(100, 200, 800, 400, 25);
-
-    avoid.mult(this.avoidWeight);
-    alignment.mult(this.alignWeight);
-    cohesion.mult(this.cohesionWeight);
-    separation.mult(this.separationWeight);
-    boundaries.mult(this.boundariesWeight);
-
-    this.applyForce(alignment);
-    this.applyForce(cohesion);
-    this.applyForce(separation);
-    this.applyForce(boundaries);
-    this.applyForce(avoid);
+  flock(boids, obstacles, target = null) {
+    const alignment = this.align(boids).mult(this.alignWeight);
+    const cohesion = this.cohesion(boids).mult(this.cohesionWeight);
+    const separation = this.separation(boids).mult(this.separationWeight);
+    const boundaries = this.boundaries(this.boundariesX, this.boundariesY, this.boundariesWidth, this.boundariesHeight, this.boundariesDistance).mult(this.boundariesWeight);
+    const flockForce = alignment.add(cohesion).add(separation).add(boundaries);
+    const obstacleForce = this.avoid(obstacles).mult(this.avoidWeight);
+    const targetForce = target ? this.fleeWithTargetRadius(target) : createVector(0, 0);
+    const safetyForce = obstacleForce.add(targetForce);
+    const combined = safetyForce.magSq() > 0 ? safetyForce.add(flockForce.mult(0.25)) : flockForce;
+    combined.limit(this.maxForce);
+    this.applyForce(combined);
+    return combined;
   }
 
-  avoid(obstacles) {
-    // TODO
-
-
-    // il regarde par exemple 20 frames devant lui
-    let ahead = this.vel.copy()
-    ahead.mult(30);
-    if (Boid.debug)
-      // on le dessine avec ma méthode this.drawVector(pos vecteur, color)
-      this.drawVector(this.pos, ahead, "yellow");
-
-    // on calcule la distance entre le point au bout du vecteur ahead
-    // et le centre de l'obstacle le plus proche
-    let pointAuBoutDeAhead = p5.Vector.add(this.pos, ahead);
-
-    if (Boid.debug) {
-      // on dessine le point pour vérifier
-      push()
-      fill("red");
-      circle(pointAuBoutDeAhead.x, pointAuBoutDeAhead.y, 10);
-      pop();
+  // Répulsion simple du cercle : aucune anticipation d'obstacle n'est faite.
+  avoid(obstacles = []) {
+    let strongest = createVector(0, 0);
+    for (const obstacle of obstacles || []) {
+      if (!obstacle || !obstacle.pos) continue;
+      const force = this.fleeFromCircle(obstacle.pos, obstacle.r + this.largeurZoneEvitementDevantVaisseau);
+      if (force.magSq() > strongest.magSq()) strongest = force;
     }
-    // 1 - on duplique le vecteur vitesse
-    // calcul d'un vecteur ahead devant le véhicule
-    // ahead2 est deux fois plus petit
-    let ahead2 = this.vel.copy()
-    ahead2.mult(15);
-    if (Boid.debug) {
-      // on le dessine avec ma méthode this.drawVector(pos vecteur, color)
-      this.drawVector(this.pos, ahead2, "purple");
-    }
-    // on calcule la distance entre le point au bout du vecteur ahead
-    // et le centre de l'obstacle le plus proche
-    let pointAuBoutDeAhead2 = p5.Vector.add(this.pos, ahead2);
-    if (Boid.debug) {
-      // on dessine le point pour vérifier
-      push()
-      fill("lightblue");
-      circle(pointAuBoutDeAhead2.x, pointAuBoutDeAhead2.y, 10);
-      pop();
-
-      // on dessine la zone d'évitement
-      push()
-      stroke(255, 50)
-      strokeWeight(this.largeurZoneEvitementDevantVaisseau * 2)
-      line(this.pos.x, this.pos.y, pointAuBoutDeAhead.x, pointAuBoutDeAhead.y)
-      pop()
-    }
-    // On cherche l'obstacle le plus proche
-    let obstacleLePlusProche = this.getObstacleLePlusProche(obstacles);
-
-    // on regarde aussi le vehicule le plus proche
-    //let vehiculeLePlusProche = this.getVehiculeLePlusProche(vehicules)
-    let distance4 = 1000000;
-
-    /*
-    if (vehiculeLePlusProche !== undefined) {
-      // on calcule la distance4 entre le vaisseau et
-      // ce vehicule
-      distance4 = this.pos.dist(vehiculeLePlusProche.pos);
-    }
-*/
-    let distance = obstacleLePlusProche.pos.dist(pointAuBoutDeAhead);
-    let distance2 = obstacleLePlusProche.pos.dist(pointAuBoutDeAhead2);
-    let distance3 = obstacleLePlusProche.pos.dist(this.pos);
-
-    let pointLePlusProche = pointAuBoutDeAhead;
-
-    if (distance2 < distance) {
-      distance = distance2;
-      pointLePlusProche = pointAuBoutDeAhead2
-    }
-
-    if (distance3 < distance) {
-      distance = distance3;
-      pointLePlusProche = this.pos;
-    }
-    if (distance4 < distance) {
-      // on a bien un vaisseau qui est plus près que l'obstacle le plus proche
-      if (distance4 < 2 * this.r) {
-        // il y a collision, on calcule la force
-        let force = p5.Vector.sub(this.pos, vehiculeLePlusProche.pos);
-
-        if (Boid.debug)
-          this.drawVector(vehiculeLePlusProche.pos, force, "yellow");
-
-        force.setMag(this.maxForce);
-        return force;
-
-      }
-    } else {
-      if (distance < obstacleLePlusProche.r + this.largeurZoneEvitementDevantVaisseau) {
-        // on calcule le vecteur qui part du centre du cercle et qui va
-        // jusqu'au point au bout de ahead
-        let force = p5.Vector.sub(pointLePlusProche, obstacleLePlusProche.pos);
-
-        if (Boid.debug)
-          this.drawVector(obstacleLePlusProche.pos, force, "yellow");
-
-        force.setMag(this.maxForce/2);
-        return force;
-      }
-    }
-    return createVector(0, 0);
+    return strongest;
   }
 
-    getObstacleLePlusProche(obstacles) {
-    let plusPetiteDistance = 100000000;
-    let obstacleLePlusProche = undefined;
-
-    obstacles.forEach(o => {
-      // Je calcule la distance entre le vaisseau et l'obstacle
-      const distance = this.pos.dist(o.pos);
-
-      if (distance < plusPetiteDistance) {
-        plusPetiteDistance = distance;
-        obstacleLePlusProche = o;
-      }
-    });
-
-    return obstacleLePlusProche;
+  fleeFromCircle(center, radius) {
+    const away = p5.Vector.sub(this.pos, center);
+    const distance = away.mag();
+    if (distance >= radius || radius <= 0) return createVector(0, 0);
+    if (distance === 0) away.set(1, 0);
+    away.normalize().mult(this.maxSpeed);
+    return away.sub(this.vel).limit(this.maxForce);
   }
 
+  fleeWithTargetRadius(target, offset = 10) {
+    if (!target) return createVector(0, 0);
+    const center = target.pos || target;
+    return this.fleeFromCircle(center, (target.r || 0) + offset);
+  }
   align(boids) {
     let perceptionRadius = this.perceptionRadius;
 
@@ -301,25 +185,6 @@ class Boid {
     // inverse de seek ! 
     let force = this.seek(target).mult(-1);
     return force;
-  }
-
-  fleeWithTargetRadius(target) {
-    const d = this.pos.dist(target.pos);
-    let rayonZoneAFuir = target.r + 10;
-
-    if (d < rayonZoneAFuir) {
-      // On dessine le cercle de la zone à fuir
-      push();
-      stroke("red");
-      strokeWeight(2);
-      circle(target.pos.x, target.pos.y, rayonZoneAFuir*2);
-    pop();
-
-      // je fuis la cible, on réutilise le comportement flee
-      const fleeForce = this.flee(target.pos);
-      fleeForce.mult(100);
-      this.applyForce(fleeForce);
-    }
   }
 
   wander() {
@@ -423,8 +288,7 @@ class Boid {
     if (vitesseDesiree !== null) {
       vitesseDesiree.setMag(this.maxSpeed);
       const force = p5.Vector.sub(vitesseDesiree, this.vel);
-      vitesseDesiree.limit(this.maxForce);
-      return vitesseDesiree;
+      return force.limit(this.maxForce);
     }
 
     if (Boid.debug) {
@@ -471,34 +335,60 @@ class Boid {
 
   update() {
     this.pos.add(this.vel);
+    this.trail.push(this.pos.copy());
+    if (this.trail.length > this.trailMaxLength) this.trail.shift();
     this.vel.add(this.acc);
     this.vel.limit(this.maxSpeed);
     this.acc.mult(0);
   }
 
   show() {
+    if (this.trail.length > 1) {
+      push();
+      noFill();
+      strokeWeight(Math.max(1, this.r * 0.22));
+      for (let i = 1; i < this.trail.length; i++) {
+        stroke(100, 210, 255, map(i, 0, this.trail.length - 1, 20, 150));
+        line(this.trail[i - 1].x, this.trail[i - 1].y, this.trail[i].x, this.trail[i].y);
+      }
+      pop();
+    }
+
     if (this.image !== undefined) {
       imageMode(CENTER);
-
-      // On regarde la direction dans laquelle le boid va :
       push();
       translate(this.pos.x, this.pos.y);
-
-      // J'ai rajouté PI car l'image était à l'envers
-      rotate(this.vel.heading()); //+ Math.PI;
-      
+      rotate(this.vel.heading());
       image(this.image, 0, 0, this.r, this.r);
-
       pop();
-
       return;
-    } else {
-      strokeWeight(this.r);
-      stroke(255);
-      point(this.pos.x, this.pos.y);
     }
+
+    push();
+    translate(this.pos.x, this.pos.y);
+    rotate(this.vel.heading());
+    noStroke();
+    fill(255, 220);
+    beginShape();
+    vertex(this.r * 1.7, 0);
+    vertex(-this.r, -this.r * 0.7);
+    vertex(-this.r * 0.55, 0);
+    vertex(-this.r, this.r * 0.7);
+    endShape(CLOSE);
+    pop();
   }
 
+  setImage(image) {
+    this.image = image || undefined;
+    if (!this.image) {
+      this.imageL = undefined;
+      this.imageH = undefined;
+      return;
+    }
+    const ratio = this.image.width / this.image.height;
+    this.imageL = this.r;
+    this.imageH = this.r / ratio;
+  }
   edges() {
     if (this.pos.x > width) {
       this.pos.x = 0;

@@ -5,10 +5,9 @@
 
 // Equivalent du tableau de véhicules dans les autres exemples
 const flock = [];
+let neighborGrid;
 let fishImage;
 let requinImage;
-let obstacleSouris;
-
 let obstacles = [];
 
 let alignSlider, cohesionSlider, separationSlider;
@@ -16,6 +15,7 @@ let labelNbBoids;
 
 let target;
 let requin;
+let useFishSprite = true;
 
 function preload() {
   // On charge une image de poisson
@@ -32,6 +32,7 @@ function preload() {
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+  neighborGrid = new SpatialGrid(120);
 
   // Quelques sliders pour régler les "poids" des trois comportements de flocking
   // flocking en anglais c'est "se rassembler"
@@ -48,7 +49,7 @@ function setup() {
   // On créer les "boids". Un boid en anglais signifie "un oiseau" ou "un poisson"
   // Dans cet exemple c'est l'équivalent d'un véhicule dans les autres exemples
   for (let i = 0; i < 200; i++) {
-    const b = new Boid(random(width), random(height), fishImage);
+    const b = createBoid(random(width), random(height));
     b.r = random(8, 40);
     flock.push(b);
   }
@@ -58,6 +59,9 @@ function setup() {
   // couleur blanche
   labelNbBoids.style('color', 'white');
   labelNbBoids.position(10, posYSliderDeDepart+180);
+  const controlsHint = createP('Souris : cible répulsive · O : ajouter · X : retirer un obstacle · I : sprite / forme · D : debug');
+  controlsHint.style('color', 'white');
+  controlsHint.position(10, posYSliderDeDepart + 215);
 
   // target qui suit la souris
   target = createVector(mouseX, mouseY);
@@ -69,9 +73,10 @@ function setup() {
   requin.maxSpeed = 7;
   requin.maxForce = 0.5;
 
-  // souris = obstacle
-  obstacleSouris = new Obstacle(mouseX, mouseY, 30, "lightgreen");
-  obstacles.push(obstacleSouris);
+}
+
+function createBoid(x, y) {
+  return useFishSprite ? new Boid(x, y, fishImage) : new Boid(x, y);
 }
 
 function creerUnSlider(label, tabVehicules, min, max, val, step, posX, posY, propriete) {
@@ -100,11 +105,13 @@ function creerUnSlider(label, tabVehicules, min, max, val, step, posX, posY, pro
 
 function draw() {
   background(0);
+  neighborGrid.clear();
+  for (const boid of flock) neighborGrid.insert(boid);
   // une image de fond
   //imageMode(CORNER);
   //image(requinImage, 0, 0, width, height);
 
-  // dessin des obstacles
+  // Les cercles sont les obstacles et la cible mobile; ils ne sont pas des boids.
   obstacles.forEach(obstacle => {
     obstacle.show();
   });
@@ -113,24 +120,19 @@ function draw() {
     labelNbBoids.html("Nombre de boids : " + flock.length);
 
     // on dessine la cible qui suit la souris
-    target.x = mouseX;
-    target.y = mouseY;
+    target.set(mouseX, mouseY);
 
     push();
-    fill("lightgreen");
-    noStroke();
-    ellipse(target.x, target.y, target.r, target.r);
+    fill(70, 220, 180, 90);
+    stroke(120, 255, 220);
+    strokeWeight(2);
+    ellipse(target.x, target.y, target.r * 2, target.r * 2);
      pop();
 
   for (let boid of flock) {
     // équivalent de applyBehaviors, cohesion + separation + alignenement + confinement
-    boid.flock(flock, obstacles);
-
-    boid.fleeWithTargetRadius(requin);
-
-    // on tester le comportement fleeWithTargetRadius sur tous les obstacles
-    
-    boid.fleeWithTargetRadius(obstacles[0]);
+    const nearbyBoids = neighborGrid.query(boid.pos, boid.perceptionRadius * 2);
+    boid.flock(nearbyBoids, obstacles, target);
 
     boid.update();
     boid.show();
@@ -182,20 +184,10 @@ function draw() {
   requin.update();
   requin.show();
 
-  // souris = obstacle
-  obstacleSouris.pos.x = mouseX;
-  obstacleSouris.pos.y = mouseY;
-
-  // On dessine tous les obstacles
-  obstacles.forEach(obstacle => {
-    obstacle.show();
-  });
-
-  //
 }
 
 function mouseDragged() {
-  const b = new Boid(mouseX, mouseY, fishImage);
+  const b = createBoid(mouseX, mouseY);
   
   b.r = random(8, 40);
 
@@ -205,8 +197,6 @@ function mouseDragged() {
 }
 
 function mousePressed() {
-  // TODO : ajouter un obstacle de taille aléatoire à la position de la souris
-  obstacles.push(new Obstacle(mouseX, mouseY, random(20, 100), "green"));
 }
 
 function keyPressed() {
@@ -217,9 +207,14 @@ function keyPressed() {
     flock.forEach(b => {
       b.r = random(8, 40);
     });
-  } else if( key === 'o') {
+  } else if (key === 'i' || key === 'I') {
+    useFishSprite = !useFishSprite;
+    flock.forEach(boid => boid.setImage(useFishSprite ? fishImage : undefined));
+  } else if (key === 'o' || key === 'O') {
     // ajouter un obstacle à la position de la souris
-    let o = new Obstacle(mouseX, mouseY, random(20, 60), "lightgreen");
+    let o = new Obstacle(mouseX, mouseY, random(20, 60), '#7ee6a3');
     obstacles.push(o);
+  } else if (key === 'x' || key === 'X') {
+    removeObstacleAt(obstacles, mouseX, mouseY);
   }
 }

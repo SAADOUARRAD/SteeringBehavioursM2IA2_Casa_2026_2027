@@ -50,6 +50,13 @@ class Moto extends Vehicle {
     // Poids des comportements
     this.followPathWeight = 2.0;
     this.separateWeight = 2.5;
+    this.obstacleWeight = 3.2;
+    this.obstacleDetectionDistance = 170;
+    this.drivingStyle = 'normal';
+    this.followPrecision = 1;
+    this.isAvoidingObstacle = false;
+    this.isAvoidingVehicle = false;
+    this.detectedObstacle = null;
 
     // Angle d'inclinaison dynamique dans les courbes (-1 = plein gauche, +1 = plein droite)
     this.lean = 0;
@@ -104,18 +111,28 @@ class Moto extends Vehicle {
    * @param {Path} path          Circuit
    * @param {ExhaustParticle[]} particles Tableau pour recevoir les particules d'échappement
    */
-  applyBehaviors(vehicles, path = null, particles = null) {
+  applyBehaviors(vehicles, path = null, particles = null, obstacles = [], goalForce = null) {
     // 1. Force de suivi de trajectoire idéale (si chemin fourni)
-    let fFollow = path ? this.follow(path) : createVector(0, 0);
+    let fFollow = goalForce ? goalForce.copy() : (path ? this.follow(path) : createVector(0, 0));
 
     // 2. Force de séparation pour éviter les collisions avec les concurrents
     let sSeparate = vehicles && vehicles.length > 0 ? this.separate(vehicles) : createVector(0, 0);
+    const avoidance = obstacleAvoidance(this, obstacles, this.obstacleDetectionDistance);
+    const collisionAvoidance = vehicleCollisionAvoidance(this, vehicles, 18);
+    this.isAvoidingObstacle = !!avoidance.obstacle;
+    this.isAvoidingVehicle = !!collisionAvoidance.vehicle;
+    this.detectedObstacle = avoidance.obstacle;
 
-    fFollow.mult(this.followPathWeight);
+    // Priorité sécurité : l'évitement garde sa pleine influence et le suivi
+    // est momentanément assoupli lorsqu'un obstacle entre dans le corridor.
+    const safetyPriority = this.isAvoidingObstacle || this.isAvoidingVehicle;
+    fFollow.mult(this.followPathWeight * (safetyPriority ? 0.3 : this.followPrecision));
     sSeparate.mult(this.separateWeight);
-
-    this.applyForce(fFollow);
-    this.applyForce(sSeparate);
+    const combined = fFollow.add(sSeparate)
+      .add(avoidance.force.mult(this.obstacleWeight))
+      .add(collisionAvoidance.force.mult(this.obstacleWeight));
+    combined.limit(this.maxForce);
+    this.applyForce(combined);
 
     // 3. Gestion de l'inclinaison (lean) selon la vitesse de rotation
     let currentHeading = this.vel.heading();
@@ -303,7 +320,38 @@ class Moto extends Vehicle {
 
     // Mode debug
     if (isDebug) {
+      noFill();
+      stroke(this.isAvoidingObstacle || this.isAvoidingVehicle ? '#ff4d4d' : '#f1c40f', 150);
+      strokeWeight(1);
+      circle(this.pos.x, this.pos.y, this.obstacleDetectionDistance * 2);
+      if (this.detectedObstacle) {
+        stroke('#ff4d4d');
+        line(this.pos.x, this.pos.y, this.detectedObstacle.pos.x, this.detectedObstacle.pos.y);
+      }
       this.renderDebug();
+    }
+  }
+
+  configure(options = {}) {
+    if (Number.isFinite(options.maxSpeed)) {
+      this.originalMaxSpeed = constrain(options.maxSpeed, 1, 10);
+      if (!this.isNitro) this.maxSpeed = this.originalMaxSpeed;
+    }
+    if (Number.isFinite(options.maxForce)) {
+      this.originalMaxForce = constrain(options.maxForce, 0.1, 1.5);
+      if (!this.isNitro) this.maxForce = this.originalMaxForce;
+    }
+    if (Number.isFinite(options.followPrecision)) this.followPrecision = constrain(options.followPrecision, 0.25, 2);
+    if (Number.isFinite(options.detectionDistance)) this.obstacleDetectionDistance = constrain(options.detectionDistance, 40, 400);
+    if (['prudent', 'normal', 'aggressive'].includes(options.drivingStyle)) {
+      this.drivingStyle = options.drivingStyle;
+      const profiles = {
+        prudent: { obstacle: 4.5, separate: 3.8 },
+        normal: { obstacle: 3.2, separate: 2.8 },
+        aggressive: { obstacle: 2.4, separate: 1.8 }
+      };
+      this.obstacleWeight = profiles[this.drivingStyle].obstacle;
+      this.separateWeight = profiles[this.drivingStyle].separate;
     }
   }
 

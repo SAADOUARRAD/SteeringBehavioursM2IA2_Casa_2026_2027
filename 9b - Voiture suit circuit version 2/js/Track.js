@@ -11,15 +11,129 @@ class Boundary {
 
     show() {
         if (this.type === "wall") {
-            stroke(255);
-            strokeWeight(2);
+            // Rail de sécurité luminescent moderne
+            stroke(56, 189, 248, 160);
+            strokeWeight(1.6);
+            line(this.a.x, this.a.y, this.b.x, this.b.y);
         } else if (this.type === "checkpoint") {
-            stroke(0, 255, 0, 40);
-            strokeWeight(1);
+            if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+                stroke(16, 185, 129, 60);
+                strokeWeight(1);
+                line(this.a.x, this.a.y, this.b.x, this.b.y);
+            }
         }
-        line(this.a.x, this.a.y, this.b.x, this.b.y);
-        strokeWeight(1);
     }
+}
+
+/**
+ * Dessine la surface asphaltée complète du circuit avec vibreurs F1,
+ * ligne médiane de sécurité pointillée et ligne d'arrivée à damier.
+ */
+function drawTrackSurface() {
+    if (!trackInnerPoints || trackInnerPoints.length === 0 || !trackOuterPoints || trackOuterPoints.length === 0) return;
+
+    const len = trackInnerPoints.length;
+
+    push();
+
+    // 1. ZONES DE DÉGAGEMENT (Léger halo d'ambiance autour de la piste)
+    if (trackCenterPoints && trackCenterPoints.length > 0) {
+        noFill();
+        stroke(16, 24, 38, 140);
+        strokeWeight(TRACK_WIDTH + 28);
+        strokeCap(ROUND);
+        strokeJoin(ROUND);
+        beginShape();
+        for (let i = 0; i < trackCenterPoints.length; i++) {
+            vertex(trackCenterPoints[i][0], trackCenterPoints[i][1]);
+        }
+        endShape(CLOSE);
+    }
+
+    // 2. SURFACE DE L'ASPHALTE NOIR DE COURSE
+    noStroke();
+    fill(20, 26, 38); // Asphalte anthracite F1
+    beginShape(TRIANGLE_STRIP);
+    for (let i = 0; i <= len; i++) {
+        let idx = i % len;
+        vertex(trackInnerPoints[idx][0], trackInnerPoints[idx][1]);
+        vertex(trackOuterPoints[idx][0], trackOuterPoints[idx][1]);
+    }
+    endShape();
+
+    // 3. VIBREURS BICOLORES DE COURSE (Kerbs Rouge & Blanc)
+    const kerbBlockSize = 5;
+    const kerbThickness = 4.5;
+
+    for (let i = 0; i < len; i++) {
+        let isRed = Math.floor(i / kerbBlockSize) % 2 === 0;
+        let c = isRed ? color(239, 68, 68, 220) : color(255, 255, 255, 220);
+        let nextI = (i + 1) % len;
+
+        // Vibreur intérieur
+        let inP1 = trackInnerPoints[i];
+        let inP2 = trackInnerPoints[nextI];
+        stroke(c);
+        strokeWeight(kerbThickness);
+        line(inP1[0], inP1[1], inP2[0], inP2[1]);
+
+        // Vibreur extérieur
+        let outP1 = trackOuterPoints[i];
+        let outP2 = trackOuterPoints[nextI];
+        stroke(c);
+        strokeWeight(kerbThickness);
+        line(outP1[0], outP1[1], outP2[0], outP2[1]);
+    }
+
+    // 4. LIGNE MÉDIANE POINTILLÉE DORÉE (Safety Centerline)
+    if (trackCenterPoints && trackCenterPoints.length > 0) {
+        if (typeof drawingContext !== 'undefined' && drawingContext.setLineDash) {
+            drawingContext.setLineDash([12, 16]);
+        }
+        noFill();
+        stroke(250, 204, 21, 130); // Jaune sécurité F1
+        strokeWeight(1.6);
+        beginShape();
+        for (let i = 0; i < trackCenterPoints.length; i++) {
+            vertex(trackCenterPoints[i][0], trackCenterPoints[i][1]);
+        }
+        endShape(CLOSE);
+        if (typeof drawingContext !== 'undefined' && drawingContext.setLineDash) {
+            drawingContext.setLineDash([]);
+        }
+    }
+
+    // 5. LIGNE DE DÉPART / ARRIVÉE À DAMIER (Checkered Finish Line)
+    if (checkpoints && checkpoints.length > 0) {
+        let cp0 = checkpoints[0];
+        let pA = cp0.a;
+        let pB = cp0.b;
+        let numCheckers = 10;
+
+        strokeWeight(3.5);
+        for (let k = 0; k < numCheckers; k++) {
+            let t1 = k / numCheckers;
+            let t2 = (k + 1) / numCheckers;
+            let x1 = lerp(pA.x, pB.x, t1);
+            let y1 = lerp(pA.y, pB.y, t1);
+            let x2 = lerp(pA.x, pB.x, t2);
+            let y2 = lerp(pA.y, pB.y, t2);
+
+            stroke(k % 2 === 0 ? color(255, 255, 255, 230) : color(20, 20, 25, 230));
+            line(x1, y1, x2, y2);
+        }
+
+        // Mention discrète
+        noStroke();
+        fill(255, 255, 255, 190);
+        textSize(8);
+        textAlign(CENTER, CENTER);
+        let midX = (pA.x + pB.x) / 2;
+        let midY = (pA.y + pB.y) / 2;
+        text("🏁 FINISH", midX, midY - 12);
+    }
+
+    pop();
 }
 
 function showTiles() {
@@ -314,6 +428,11 @@ function setupTrack(fullRegen = true) {
     const apply = (pts) => pts.forEach(p => { p[0] = p[0] * scale + shiftX; p[1] = p[1] * scale + shiftY; });
     apply(innerPoints); apply(outerPoints); apply(centerPoints);
     currentTiles.forEach(t => { t.x = t.x * scale + shiftX; t.y = t.y * scale + shiftY; t.w *= scale; t.h *= scale; });
+
+    // Mémorisation globale pour le rendu de la surface d'asphalte
+    trackInnerPoints = innerPoints;
+    trackOuterPoints = outerPoints;
+    trackCenterPoints = centerPoints;
 
     // CONSTRUCTION & CHECKPOINTS
     const cpStep = 4;

@@ -26,9 +26,6 @@ function windowResized() {
 function draw() {
     background(11, 14, 20);
 
-    // Rendu des cartes LEGO et du tracé du circuit
-    showTiles();
-
     // Boucle de simulation (Vitesse d'entraînement / Time Warp)
     let steps = TRAINING_PAUSED ? 0 : SIMULATION_SPEED;
     for (let s = 0; s < steps; s++) {
@@ -42,6 +39,14 @@ function draw() {
         let targetY = height / 2 - bestCar.pos.y;
         translate(targetX, targetY);
     }
+
+    // 0. Surface de piste asphaltée réaliste F1 & vibreurs
+    if (typeof drawTrackSurface === 'function') {
+        drawTrackSurface();
+    }
+
+    // Rendu des cartes LEGO et du tracé du circuit
+    showTiles();
 
     // 1. Dessin des Checkpoints
     for (let i = 0; i < checkpoints.length; i++) {
@@ -60,6 +65,9 @@ function draw() {
     for (let wall of walls) {
         wall.show();
     }
+
+    // 2.5 Étincelles et débris de crash
+    updateAndDrawSparks();
 
     // 3. Dessin des voitures
     for (let car of cars) {
@@ -86,7 +94,28 @@ function draw() {
         drawSchematicNetworkVisualizer();
     }
 
-    // 5. Mise à jour de la télémétrie dans le DOM et sur le canvas
+    // 5. Graphe d'évolution de la fitness (Best & Moyenne)
+    if (SHOW_FITNESS_GRAPH) {
+        drawFitnessEvolutionGraph();
+    }
+
+    // 6. Jauges en direct des capteurs LiDAR du leader
+    if (SHOW_LIDAR_RADAR) {
+        drawLidarSensorBars();
+    }
+
+    // 7. Tableau de bord Cockpit F1 (Vitesse km/h & Chrono)
+    drawCockpitHUD();
+
+    // 8. Minimap radar du circuit
+    if (SHOW_MINIMAP) {
+        drawTrackMinimap();
+    }
+
+    // 9. Bannière d'alerte record du tour
+    drawRecordBanner();
+
+    // 10. Mise à jour de la télémétrie dans le DOM et sur le canvas
     updateTelemetryUI();
 }
 
@@ -138,13 +167,57 @@ function checkCollisions(car) {
     for (let w of walls) {
         if (distPointToSegment(car.pos, w.a, w.b) < car.width * 0.55) {
             car.dead = true;
+            createCrashSparks(car.pos.x, car.pos.y, 14);
             return;
         }
     }
 
     if (car.pos.x < 0 || car.pos.x > width || car.pos.y < 0 || car.pos.y > height) {
         car.dead = true;
+        createCrashSparks(car.pos.x, car.pos.y, 8);
     }
+}
+
+// --- VFX : Particules d'étincelles lors des crashs ---
+function createCrashSparks(x, y, count = 12) {
+    if (typeof createVector !== 'function' || typeof p5 === 'undefined') return;
+    for (let i = 0; i < count; i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = 1.5 + Math.random() * 4.5;
+        sparks.push({
+            pos: createVector(x, y),
+            vel: createVector(Math.cos(angle) * speed, Math.sin(angle) * speed),
+            lifespan: 25 + Math.floor(Math.random() * 20),
+            maxLife: 45,
+            size: 2 + Math.random() * 3,
+            isGold: Math.random() > 0.4
+        });
+    }
+}
+
+function updateAndDrawSparks() {
+    if (!sparks || sparks.length === 0 || typeof push !== 'function') return;
+    push();
+    noStroke();
+    for (let i = sparks.length - 1; i >= 0; i--) {
+        let p = sparks[i];
+        p.pos.add(p.vel);
+        p.vel.mult(0.92);
+        p.lifespan--;
+
+        let alpha = map(p.lifespan, 0, p.maxLife, 0, 255);
+        if (p.isGold) {
+            fill(245, 158, 11, alpha);
+        } else {
+            fill(56, 189, 248, alpha);
+        }
+        circle(p.pos.x, p.pos.y, p.size * (p.lifespan / p.maxLife));
+
+        if (p.lifespan <= 0) {
+            sparks.splice(i, 1);
+        }
+    }
+    pop();
 }
 
 /**
@@ -261,6 +334,356 @@ function drawSchematicNetworkVisualizer() {
 }
 
 /**
+ * ============================================================================
+ * GRAPHE D'ÉVOLUTION DE LA FITNESS (Best & Moyenne en temps réel)
+ * ============================================================================
+ */
+function drawFitnessEvolutionGraph() {
+    let boxW = 280;
+    let boxH = 180;
+    let boxX = 315;
+    let boxY = height - boxH - 20;
+
+    // Si l'écran est compact, ajuster pour ne pas déborder
+    if (boxX + boxW > width - 360) {
+        boxX = 20;
+        boxY = height - boxH * 2 - 30;
+    }
+
+    push();
+    // Cadre cyberpunk
+    fill(13, 19, 33, 230);
+    stroke(16, 185, 129, 120);
+    strokeWeight(1.5);
+    rect(boxX, boxY, boxW, boxH, 10);
+
+    // Titre
+    noStroke();
+    fill(248, 250, 252);
+    textSize(11);
+    textAlign(LEFT, TOP);
+    textStyle(BOLD);
+    text("📈 ÉVOLUTION FITNESS", boxX + 12, boxY + 10);
+
+    fill(148, 163, 184);
+    textSize(9);
+    textStyle(NORMAL);
+    text(`Générations 1 à ${generation}`, boxX + 12, boxY + 24);
+
+    let graphX = boxX + 42;
+    let graphY = boxY + 42;
+    let graphW = boxW - 58;
+    let graphH = boxH - 68;
+
+    // Grille millimétrée
+    stroke(255, 255, 255, 20);
+    strokeWeight(1);
+    for (let k = 0; k <= 3; k++) {
+        let gy = graphY + (graphH * k) / 3;
+        line(graphX, gy, graphX + graphW, gy);
+    }
+
+    if (generationHistory.length < 2) {
+        fill(148, 163, 184);
+        textSize(10);
+        textAlign(CENTER, CENTER);
+        text("Données d'apprentissage...\n(Visible dès la Gen 2)", graphX + graphW / 2, graphY + graphH / 2);
+        pop();
+        return;
+    }
+
+    // Trouver le maximum de fitness pour l'échelle
+    let maxFit = Math.max(100, ...generationHistory.map(g => Math.max(g.bestFitness, g.avgFitness)));
+
+    // Tracer les courbes Best et Avg
+    let n = generationHistory.length;
+    let stepX = graphW / Math.max(1, n - 1);
+
+    // 1. Courbe Moyenne (Cyan)
+    noFill();
+    stroke(56, 189, 248, 180);
+    strokeWeight(1.5);
+    beginShape();
+    for (let i = 0; i < n; i++) {
+        let x = graphX + i * stepX;
+        let y = graphY + graphH - (generationHistory[i].avgFitness / maxFit) * graphH;
+        vertex(x, y);
+    }
+    endShape();
+
+    // 2. Courbe Best (Émeraude lumineux)
+    stroke(16, 185, 129, 240);
+    strokeWeight(2.2);
+    beginShape();
+    for (let i = 0; i < n; i++) {
+        let x = graphX + i * stepX;
+        let y = graphY + graphH - (generationHistory[i].bestFitness / maxFit) * graphH;
+        vertex(x, y);
+    }
+    endShape();
+
+    // Point sur le dernier record
+    let lastX = graphX + (n - 1) * stepX;
+    let lastBestY = graphY + graphH - (generationHistory[n - 1].bestFitness / maxFit) * graphH;
+    noStroke();
+    fill(16, 185, 129);
+    circle(lastX, lastBestY, 5.5);
+
+    // Valeur max Y
+    fill(148, 163, 184);
+    textSize(8);
+    textAlign(RIGHT, CENTER);
+    text(Math.round(maxFit), graphX - 4, graphY + 4);
+    text("0", graphX - 4, graphY + graphH);
+
+    // Légende en bas
+    textAlign(LEFT, CENTER);
+    textSize(8);
+    fill(16, 185, 129);
+    text("● Best", boxX + 15, boxY + boxH - 12);
+    fill(56, 189, 248);
+    text("● Moyenne", boxX + 70, boxY + boxH - 12);
+
+    pop();
+}
+
+/**
+ * ============================================================================
+ * JAUGES EN TEMPS RÉEL DES CAPTEURS LIDAR DU LEADER
+ * ============================================================================
+ */
+function drawLidarSensorBars() {
+    let activeCar = bestCar || (cars.length > 0 ? cars[0] : null);
+    if (!activeCar || !activeCar.rays || activeCar.rays.length === 0) return;
+
+    let rays = activeCar.rays;
+    let count = rays.length;
+    let boxW = 210;
+    let boxH = 36 + count * 15;
+    let boxX = 20;
+    let boxY = 105;
+
+    push();
+    fill(13, 19, 33, 220);
+    stroke(56, 189, 248, 110);
+    strokeWeight(1.2);
+    rect(boxX, boxY, boxW, boxH, 8);
+
+    noStroke();
+    fill(248, 250, 252);
+    textSize(10);
+    textStyle(BOLD);
+    textAlign(LEFT, TOP);
+    text("📡 CAPTEURS LIDAR (LEADER)", boxX + 10, boxY + 8);
+
+    textStyle(NORMAL);
+    let barStartX = boxX + 38;
+    let barMaxW = 110;
+
+    for (let i = 0; i < count; i++) {
+        let r = rays[i];
+        let frac = (r && r.hitFraction !== undefined) ? r.hitFraction : 1.0;
+        let y = boxY + 28 + i * 15;
+
+        // Label rayon
+        fill(148, 163, 184);
+        textSize(8);
+        textAlign(LEFT, CENTER);
+        text(`R${i + 1}`, boxX + 10, y + 4);
+
+        // Fond barre
+        fill(30, 41, 59);
+        rect(barStartX, y, barMaxW, 8, 2.5);
+
+        // Barre active colorée
+        let barW = Math.max(3, frac * barMaxW);
+        if (frac < 0.3) {
+            fill(239, 68, 68); // Rouge danger
+        } else if (frac < 0.65) {
+            fill(245, 158, 11); // Ambre
+        } else {
+            fill(16, 185, 129); // Vert dégagé
+        }
+        rect(barStartX, y, barW, 8, 2.5);
+
+        // Pourcentage
+        fill(248, 250, 252);
+        textSize(8);
+        textAlign(LEFT, CENTER);
+        text(`${Math.round(frac * 100)}%`, barStartX + barMaxW + 8, y + 4);
+    }
+
+    pop();
+}
+
+/**
+ * ============================================================================
+ * TABLEAU DE BORD COCKPIT F1 (Vitesse km/h & Chronomètre)
+ * ============================================================================
+ */
+function drawCockpitHUD() {
+    let activeCar = bestCar || (cars.length > 0 ? cars[0] : null);
+    let speedKmh = 0;
+    let lapTimeStr = "--:--";
+
+    if (activeCar && !activeCar.dead) {
+        let mag = (typeof activeCar.vel.mag === 'function') ? activeCar.vel.mag() : Math.hypot(activeCar.vel.x, activeCar.vel.y);
+        speedKmh = Math.round(mag * 26);
+        let curLapSeconds = ((activeCar.frameCount - activeCar.lapStartTime) / 60).toFixed(2);
+        lapTimeStr = `${curLapSeconds}s`;
+    }
+
+    let boxW = 210;
+    let boxH = 75;
+    let boxX = 20;
+    let boxY = 20;
+
+    push();
+    fill(13, 19, 33, 230);
+    stroke(245, 158, 11, 130);
+    strokeWeight(1.5);
+    rect(boxX, boxY, boxW, boxH, 8);
+
+    // Compteur Vitesse
+    noStroke();
+    fill(148, 163, 184);
+    textSize(8);
+    textAlign(LEFT, TOP);
+    text("VITESSE LEADER", boxX + 12, boxY + 10);
+
+    fill(248, 250, 252);
+    textSize(22);
+    textStyle(BOLD);
+    text(speedKmh, boxX + 12, boxY + 22);
+
+    fill(245, 158, 11);
+    textSize(9);
+    text("KM/H", boxX + 65, boxY + 34);
+
+    // Chrono au tour
+    textStyle(NORMAL);
+    fill(148, 163, 184);
+    textSize(8);
+    text("CHRONO TOUR", boxX + 115, boxY + 10);
+
+    fill(56, 189, 248);
+    textSize(14);
+    textStyle(BOLD);
+    text(lapTimeStr, boxX + 115, boxY + 24);
+
+    // Record du tour
+    fill(148, 163, 184);
+    textSize(8);
+    textStyle(NORMAL);
+    let recStr = bestLapTimeRecord ? `${bestLapTimeRecord.toFixed(2)}s` : "--";
+    text(`Record: ${recStr}`, boxX + 115, boxY + 46);
+
+    // Barre d'accélération en bas
+    let maxSpeedKmh = Math.round(GAME_SPEED_LIMIT * 26);
+    let speedRatio = constrain(speedKmh / Math.max(1, maxSpeedKmh), 0, 1);
+    fill(30, 41, 59);
+    rect(boxX + 12, boxY + 58, boxW - 24, 7, 2);
+
+    fill(speedRatio > 0.8 ? color(239, 68, 68) : color(16, 185, 129));
+    rect(boxX + 12, boxY + 58, (boxW - 24) * speedRatio, 7, 2);
+
+    pop();
+}
+
+/**
+ * ============================================================================
+ * RADAR MINIMAP DU CIRCUIT EN HAUT À DROITE
+ * ============================================================================
+ */
+function drawTrackMinimap() {
+    if (!trackCenterPoints || trackCenterPoints.length === 0) return;
+
+    let boxW = 135;
+    let boxH = 95;
+    let boxX = width - 360 - boxW - 15;
+    let boxY = 15;
+
+    if (boxX < 240) return; // Écran trop petit
+
+    push();
+    fill(13, 19, 33, 210);
+    stroke(56, 189, 248, 90);
+    strokeWeight(1);
+    rect(boxX, boxY, boxW, boxH, 8);
+
+    noStroke();
+    fill(148, 163, 184);
+    textSize(8);
+    textAlign(LEFT, TOP);
+    text("🗺️ RADAR CIRCUIT", boxX + 8, boxY + 6);
+
+    // Calcul de l'échelle miniature
+    let scaleX = (boxW - 24) / Math.max(1, width);
+    let scaleY = (boxH - 28) / Math.max(1, height);
+    let miniScale = Math.min(scaleX, scaleY);
+    let offX = boxX + 12 + (boxW - 24 - width * miniScale) / 2;
+    let offY = boxY + 20 + (boxH - 28 - height * miniScale) / 2;
+
+    // Tracé miniature du circuit
+    noFill();
+    stroke(56, 189, 248, 120);
+    strokeWeight(1.2);
+    beginShape();
+    for (let p of trackCenterPoints) {
+        vertex(offX + p[0] * miniScale, offY + p[1] * miniScale);
+    }
+    endShape(CLOSE);
+
+    // Points des voitures vivantes
+    noStroke();
+    fill(56, 189, 248, 160);
+    for (let c of cars) {
+        if (!c.dead && c !== bestCar) {
+            circle(offX + c.pos.x * miniScale, offY + c.pos.y * miniScale, 2.5);
+        }
+    }
+
+    // Point vert leader
+    if (bestCar && !bestCar.dead) {
+        fill(16, 185, 129);
+        circle(offX + bestCar.pos.x * miniScale, offY + bestCar.pos.y * miniScale, 4.5);
+    }
+
+    pop();
+}
+
+/**
+ * ============================================================================
+ * BANNIÈRE D'ALERTE NOUVEAU RECORD DU TOUR
+ * ============================================================================
+ */
+function drawRecordBanner() {
+    if (newRecordNotificationTimer <= 0) return;
+
+    push();
+    let alpha = constrain(newRecordNotificationTimer * 4, 0, 240);
+    let bannerW = 340;
+    let bannerH = 34;
+    let bannerX = (width - 350) / 2 - bannerW / 2;
+    let bannerY = 22;
+
+    fill(245, 158, 11, alpha);
+    stroke(255, 255, 255, alpha);
+    strokeWeight(1.5);
+    rect(bannerX, bannerY, bannerW, bannerH, 8);
+
+    noStroke();
+    fill(0, 0, 0, alpha);
+    textSize(11);
+    textStyle(BOLD);
+    textAlign(CENTER, CENTER);
+    text(newRecordText, bannerX + bannerW / 2, bannerY + bannerH / 2);
+
+    newRecordNotificationTimer--;
+    pop();
+}
+
+/**
  * Met à jour les statistiques de télémétrie dans le panneau HTML
  */
 function updateTelemetryUI() {
@@ -363,6 +786,11 @@ function initDynamicUI() {
         document.getElementById('mutVal').innerText = `${Math.round(MUTATION_RATE * 100)}%`;
     });
 
+    link('mutAmountSlider', 'input', (e) => {
+        MUTATION_AMOUNT = parseFloat(e.target.value);
+        document.getElementById('mutAmountVal').innerText = MUTATION_AMOUNT.toFixed(2);
+    });
+
     // 7. BOUTON MAJEUR : [ APPLY NETWORK ] (Section 11 du cours)
     link('btnApplyNetwork', 'click', () => {
         applyNewNetworkTopology();
@@ -387,9 +815,26 @@ function initDynamicUI() {
         for (let car of cars) car.dead = true;
     });
 
-    // Boutons utilitaires
+    // Bouton Démo Champion Instantanée
+    link('btnDemoChampion', 'click', () => {
+        loadChampionModel();
+    });
+
+    // Boutons utilitaires & Toggles HUD
     link('btnToggleNN', 'click', () => {
         SHOW_NN_VISUALIZER = !SHOW_NN_VISUALIZER;
+    });
+
+    link('btnToggleGraph', 'click', () => {
+        SHOW_FITNESS_GRAPH = !SHOW_FITNESS_GRAPH;
+    });
+
+    link('btnToggleRadar', 'click', () => {
+        SHOW_LIDAR_RADAR = !SHOW_LIDAR_RADAR;
+    });
+
+    link('btnToggleMinimap', 'click', () => {
+        SHOW_MINIMAP = !SHOW_MINIMAP;
     });
 
     link('btnToggleDebug', 'click', () => {
@@ -533,6 +978,12 @@ function keyPressed() {
         DEBUG_MODE = !DEBUG_MODE;
     } else if (key === 'n' || key === 'N') {
         SHOW_NN_VISUALIZER = !SHOW_NN_VISUALIZER;
+    } else if (key === 'h' || key === 'H') {
+        SHOW_FITNESS_GRAPH = !SHOW_FITNESS_GRAPH;
+    } else if (key === 'v' || key === 'V') {
+        SHOW_LIDAR_RADAR = !SHOW_LIDAR_RADAR;
+    } else if (key === 'm' || key === 'M') {
+        SHOW_MINIMAP = !SHOW_MINIMAP;
     } else if (key === 'g' || key === 'G') {
         for (let car of cars) car.dead = true;
     } else if (key === 'f' || key === 'F') {

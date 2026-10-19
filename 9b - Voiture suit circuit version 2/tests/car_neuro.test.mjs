@@ -96,10 +96,39 @@ function createTestingContext() {
         Math,
         constrain: (v, min, max) => Math.max(min, Math.min(max, v)),
         map: (v, a, b, c, d) => c + ((v - a) / (b - a)) * (d - c),
-        random: (a, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a),
+        random: (a, b) => b === undefined ? (a === undefined ? Math.random() : Math.random() * a) : a + Math.random() * (b - a),
         color: (...args) => args,
+        lerp: (a, b, t) => a + (b - a) * t,
+        floor: Math.floor,
+        abs: Math.abs,
+        max: Math.max,
+        min: Math.min,
+        dist: (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1),
         width: 1200,
         height: 800,
+        push: () => {},
+        pop: () => {},
+        noFill: () => {},
+        stroke: () => {},
+        noStroke: () => {},
+        strokeWeight: () => {},
+        strokeCap: () => {},
+        strokeJoin: () => {},
+        beginShape: () => {},
+        vertex: () => {},
+        endShape: () => {},
+        line: () => {},
+        text: () => {},
+        textAlign: () => {},
+        textSize: () => {},
+        fill: () => {},
+        circle: () => {},
+        rect: () => {},
+        ellipse: () => {},
+        TRIANGLE_STRIP: 'triangle_strip',
+        ROUND: 'round',
+        CLOSE: 'close',
+        CENTER: 'center',
         window: { startAngle: 0, startCheckpointIndex: 0 },
         document: {
             getElementById: () => null,
@@ -112,13 +141,13 @@ function createTestingContext() {
     const context = vm.createContext(sandbox);
 
     // Chargement ordonné des scripts
-    const files = ['globals.js', 'utils.js', 'NeuralNetwork.js', 'Ray.js', 'Car.js', 'Genetic.js'];
+    const files = ['globals.js', 'utils.js', 'championPreset.js', 'NeuralNetwork.js', 'Ray.js', 'Track.js', 'Car.js', 'Genetic.js'];
     for (const f of files) {
         const code = readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8');
         vm.runInContext(code, context);
     }
 
-    const exported = vm.runInContext('({ networkConfig, NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining })', context);
+    const exported = vm.runInContext('({ networkConfig, NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining, DEFAULT_CHAMPION_PRESET, drawTrackSurface, setupTrack })', context);
     return Object.assign(context, exported);
 }
 
@@ -424,5 +453,66 @@ describe('9b Neuroévolution Racing — Tests Unitaires & Benchmarks Cahier des 
         assert.ok(!Number.isNaN(car.pos.x));
         assert.ok(!Number.isNaN(car.pos.y));
         assert.ok(!Number.isNaN(car.vel.mag()));
+    });
+
+    it('DEFAULT_CHAMPION_PRESET : modèle valide et prédictions de braquage conformes', () => {
+        const { DEFAULT_CHAMPION_PRESET, NeuralNetwork } = ctx;
+
+        assert.ok(DEFAULT_CHAMPION_PRESET, 'Le preset champion doit exister');
+        assert.equal(DEFAULT_CHAMPION_PRESET.topology.join(' → '), '5 → 10 → 6 → 2');
+
+        const brain = NeuralNetwork.fromJSON(DEFAULT_CHAMPION_PRESET);
+        assert.ok(brain, 'Le cerveau doit être instancié depuis le preset');
+
+        // Obstacle à gauche -> braquage à droite (> 0.5)
+        const turnRight = brain.predict([0.9, 0.7, 0, 0, 0]);
+        assert.ok(turnRight[0] > 0.8, `Doit braquer à droite, turnRatio=${turnRight[0]}`);
+
+        // Obstacle à droite -> braquage à gauche (< 0.5)
+        const turnLeft = brain.predict([0, 0, 0, 0.7, 0.9]);
+        assert.ok(turnLeft[0] < 0.2, `Doit braquer à gauche, turnRatio=${turnLeft[0]}`);
+
+        // Piste dégagée -> vitesse élevée
+        const straight = brain.predict([0, 0, 0, 0, 0]);
+        assert.ok(straight[1] > 0.7, `Doit accélérer sur piste dégagée, thrustRatio=${straight[1]}`);
+    });
+
+    it('Rendu du Circuit : points d asphalte et vibreurs initialisés sans erreur', () => {
+        const { setupTrack, trackInnerPoints, trackOuterPoints, trackCenterPoints, walls } = ctx;
+
+        setupTrack(true);
+        assert.ok(ctx.walls.length > 0, 'Les murs doivent être générés');
+        assert.ok(ctx.trackInnerPoints.length > 0, 'trackInnerPoints doit être peuplé');
+        assert.ok(ctx.trackOuterPoints.length > 0, 'trackOuterPoints doit être peuplé');
+        assert.ok(ctx.trackCenterPoints.length > 0, 'trackCenterPoints doit être peuplé');
+        assert.equal(ctx.trackInnerPoints.length, ctx.trackOuterPoints.length, 'Bordures interne et externe doivent avoir la même taille');
+    });
+
+    it('drawTrackSurface : s exécute de manière sûre sans exception', () => {
+        const { drawTrackSurface, setupTrack } = ctx;
+
+        // Cas 1 : sans track
+        assert.doesNotThrow(() => drawTrackSurface());
+
+        // Cas 2 : avec track initialisé
+        setupTrack(true);
+        assert.doesNotThrow(() => drawTrackSurface());
+    });
+
+    it('MUTATION_AMOUNT : paramétrage dynamique de l amplitude gaussienne sans altérer la topologie', () => {
+        const { Car, NeuralNetwork } = ctx;
+
+        const originalBrain = new NeuralNetwork([5, 10, 6, 2]);
+        const car = new Car(originalBrain, 5);
+
+        ctx.MUTATION_RATE = 0.5;
+        ctx.MUTATION_AMOUNT = 0.40;
+
+        assert.doesNotThrow(() => car.mutate(ctx.MUTATION_RATE, ctx.MUTATION_AMOUNT));
+        assert.equal(car.brain.topology.join(' → '), '5 → 10 → 6 → 2');
+
+        const out = car.brain.predict([0.5, 0.5, 0.5, 0.5, 0.5]);
+        assert.ok(!Number.isNaN(out[0]));
+        assert.ok(!Number.isNaN(out[1]));
     });
 });

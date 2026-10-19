@@ -170,24 +170,40 @@ function loadChampionModel(jsonData) {
             parsed = JSON.parse(jsonData);
         } else if (!jsonData) {
             let stored = localStorage.getItem('neuro_racing_champion');
-            if (stored) parsed = JSON.parse(stored);
+            if (stored) {
+                parsed = JSON.parse(stored);
+            } else if (typeof DEFAULT_CHAMPION_PRESET !== 'undefined') {
+                parsed = DEFAULT_CHAMPION_PRESET;
+            }
         }
 
         if (parsed) {
             let loadedBrain = NeuralNetwork.fromJSON(parsed);
             if (loadedBrain) {
                 // Adapte NUM_RAYS si le modèle a une taille d'entrée différente
-                if (loadedBrain.input_nodes - 1 !== NUM_RAYS) {
-                    updateRayCount(loadedBrain.input_nodes - 1);
+                if (loadedBrain.input_nodes !== NUM_RAYS) {
+                    updateRayCount(loadedBrain.input_nodes);
+                }
+                if (loadedBrain.topology && loadedBrain.topology.length > 2) {
+                    networkConfig.hiddenLayers = loadedBrain.topology.slice(1, -1);
+                    if (typeof updateActiveTopologyBadge === 'function') {
+                        updateActiveTopologyBadge();
+                    }
                 }
                 championModel = loadedBrain;
                 resetTraining(true);
                 for (let i = 0; i < TOTAL_POP; i++) {
                     cars[i] = new Car(loadedBrain, NUM_RAYS);
-                    if (i > 0) cars[i].mutate(MUTATION_RATE);
+                    if (i > 0) cars[i].mutate(MUTATION_RATE, MUTATION_AMOUNT);
                 }
-                alert(`Cerveau champion chargé avec succès ! (Entrées: ${loadedBrain.input_nodes}, Couches: [${loadedBrain.topology.join('-')}])`);
+                if (typeof newRecordNotificationTimer !== 'undefined') {
+                    newRecordNotificationTimer = 180;
+                    newRecordText = "🏆 CHAMPION PRÉ-ENTRAÎNÉ CHARGÉ AVEC SUCCÈS !";
+                }
+                console.log(`Cerveau champion chargé avec succès ! (Entrées: ${loadedBrain.input_nodes}, Topologie: [${loadedBrain.topology.join(' → ')}])`);
             }
+        } else {
+            alert("Aucun modèle champion sauvegardé trouvé dans le stockage local.");
         }
     } catch (e) {
         alert("Impossible de charger le modèle : " + e.message);

@@ -14,6 +14,7 @@
     <!-- Scripts du Projet 9b -->
     <script src="js/globals.js"></script>
     <script src="js/utils.js"></script>
+    <script src="js/championPreset.js"></script>
     <script src="js/NeuralNetwork.js"></script>
     <script src="js/Ray.js"></script>
     <script src="js/Track.js"></script>
@@ -171,6 +172,14 @@
                         <input type="range" id="mutSlider" min="0.01" max="0.4" value="0.12" step="0.01">
                     </div>
 
+                    <div class="control-row">
+                        <div class="label-info">
+                            <label for="mutAmountSlider">Mutation Amount :</label>
+                            <span id="mutAmountVal" class="value-tag">0.15</span>
+                        </div>
+                        <input type="range" id="mutAmountSlider" min="0.02" max="0.50" value="0.15" step="0.01">
+                    </div>
+
                     <!-- Télémétrie en temps réel -->
                     <div class="telemetry-box">
                         <div class="telemetry-item">
@@ -191,8 +200,13 @@
                         </div>
                     </div>
 
+                    <!-- Bouton Démo Champion Instantanée -->
+                    <button id="btnDemoChampion" class="btn btn-champion" title="Charge instantanément le cerveau champion pré-entraîné (5 → 10 → 6 → 2)">
+                        🏆 ⚡ DÉMO CHAMPION (AUTO)
+                    </button>
+
                     <!-- Boutons de Contrôle d'Entraînement -->
-                    <div class="training-btn-grid">
+                    <div class="training-btn-grid" style="margin-top: 8px;">
                         <button id="btnStart" class="btn btn-success" title="Démarrer l'entraînement">
                             ▶ START
                         </button>
@@ -207,11 +221,24 @@
                         </button>
                     </div>
 
-                    <!-- Options de Visualisation & Circuit -->
+                    <!-- Options de Visualisation & Télémétrie In-Game -->
                     <div class="utility-btn-row">
                         <button id="btnToggleNN" class="btn-sm" title="Afficher/Masquer le schéma du réseau (Touche N)">
                             🧠 Réseau [N]
                         </button>
+                        <button id="btnToggleGraph" class="btn-sm" title="Afficher/Masquer le graphe de fitness (Touche H)">
+                            📈 Graphe [H]
+                        </button>
+                        <button id="btnToggleRadar" class="btn-sm" title="Afficher/Masquer le radar LiDAR (Touche V)">
+                            📡 LiDAR [V]
+                        </button>
+                        <button id="btnToggleMinimap" class="btn-sm" title="Afficher/Masquer la minimap (Touche M)">
+                            🗺️ Radar [M]
+                        </button>
+                    </div>
+
+                    <!-- Sauvegarde & Debug -->
+                    <div class="utility-btn-row" style="margin-top: 4px;">
                         <button id="btnToggleDebug" class="btn-sm" title="Activer/Désactiver le mode debug (Touche D)">
                             🛠 Debug [D]
                         </button>

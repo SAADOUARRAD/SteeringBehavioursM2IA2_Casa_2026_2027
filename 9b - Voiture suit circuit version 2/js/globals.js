@@ -12,6 +12,14 @@ var walls = [];
 var checkpoints = [];
 var currentTrackPath = [];
 var currentTiles = [];
+var trackInnerPoints = [];
+var trackOuterPoints = [];
+var trackCenterPoints = [];
+
+// Effets visuels & Particules
+var sparks = [];
+var newRecordNotificationTimer = 0;
+var newRecordText = "";
 
 var startX = 115;
 var startY = 115;
@@ -36,9 +44,12 @@ var TRACK_WIDTH = 110;
 var trainingFinished = false;
 var TRAINING_PAUSED = false;
 
-// Affichage & Debug
+// Affichage, Widgets & Debug
 var DEBUG_MODE = false;         // Mode debug unifié (touche 'd')
 var SHOW_NN_VISUALIZER = true;  // Affichage du réseau de neurones en direct (touche 'n')
+var SHOW_FITNESS_GRAPH = true;  // Affichage du graphe d'évolution fitness (touche 'h')
+var SHOW_LIDAR_RADAR = true;    // Affichage des jauges de capteurs LiDAR (touche 'v')
+var SHOW_MINIMAP = true;        // Affichage de la minimap radar (touche 'm')
 var FOCUS_BEST_CAR = false;     // Suivi caméra centré sur le leader (touche 'f')
 
 /**

@@ -224,6 +224,10 @@ class Car {
                 }
                 if (!bestLapTimeRecord || lapTime < bestLapTimeRecord) {
                     bestLapTimeRecord = lapTime;
+                    if (typeof newRecordNotificationTimer !== 'undefined') {
+                        newRecordNotificationTimer = 180;
+                        newRecordText = `⚡ NOUVEAU RECORD DU TOUR : ${lapTime.toFixed(2)}s !`;
+                    }
                 }
                 this.finished = true;
                 this.dead = true;
@@ -424,11 +428,21 @@ class Car {
         stroke(bodyColor);
         rect(-this.height * 0.48, 0, 3, this.width * 1.15, 1);
 
-        // Phares avant LED
+        // Phares avant LED & faisceau conique de projection
         noStroke();
         fill(255, 255, 255, 240);
         circle(this.height * 0.45, -this.width * 0.32, 2.5);
         circle(this.height * 0.45, this.width * 0.32, 2.5);
+
+        if (isBest) {
+            // Faisceau conique lumineux projeté sur la piste
+            fill(255, 255, 255, 20);
+            triangle(
+                this.height * 0.45, -this.width * 0.38,
+                this.height * 0.45, this.width * 0.38,
+                this.height * 0.45 + 55, 0
+            );
+        }
 
         // Feux stop arrière (rouges vifs en freinage)
         fill(this.isBraking ? color(255, 0, 0, 255) : color(180, 0, 0, 150));

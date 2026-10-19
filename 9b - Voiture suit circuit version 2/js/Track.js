@@ -11,9 +11,14 @@ class Boundary {
 
     show() {
         if (this.type === "wall") {
+            let railCol = color(56, 189, 248, 170);
+            if (typeof TRACK_THEME !== 'undefined') {
+                if (TRACK_THEME === 'mars') railCol = color(249, 115, 22, 180);
+                else if (TRACK_THEME === 'cyber') railCol = color(99, 102, 241, 180);
+            }
             // Rail de sécurité luminescent moderne
-            stroke(56, 189, 248, 160);
-            strokeWeight(1.6);
+            stroke(railCol);
+            strokeWeight(1.8);
             line(this.a.x, this.a.y, this.b.x, this.b.y);
         } else if (this.type === "checkpoint") {
             if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
@@ -26,6 +31,24 @@ class Boundary {
 }
 
 /**
+ * Dessine la grille futuriste d'ambiance en arrière-plan
+ */
+function drawCyberEnvironmentBackground() {
+    if (typeof width === 'undefined' || typeof height === 'undefined') return;
+    push();
+    stroke(255, 255, 255, 6);
+    strokeWeight(1);
+    let gridSize = 60;
+    for (let x = 0; x < width; x += gridSize) {
+        line(x, 0, x, height);
+    }
+    for (let y = 0; y < height; y += gridSize) {
+        line(0, y, width, y);
+    }
+    pop();
+}
+
+/**
  * Dessine la surface asphaltée complète du circuit avec vibreurs F1,
  * ligne médiane de sécurité pointillée et ligne d'arrivée à damier.
  */
@@ -35,6 +58,29 @@ function drawTrackSurface() {
     const len = trackInnerPoints.length;
 
     push();
+
+    // 0. Grille d'environnement futuriste
+    drawCyberEnvironmentBackground();
+
+    // Palette selon le thème sélectionné
+    let kerbColorA = color(239, 68, 68, 220);
+    let kerbColorB = color(255, 255, 255, 220);
+    let asphaltColor = color(20, 26, 38);
+    let centerLineColor = color(250, 204, 21, 140);
+
+    if (typeof TRACK_THEME !== 'undefined') {
+        if (TRACK_THEME === 'mars') {
+            kerbColorA = color(234, 88, 12, 230);
+            kerbColorB = color(251, 191, 36, 230);
+            asphaltColor = color(26, 18, 16);
+            centerLineColor = color(251, 146, 60, 160);
+        } else if (TRACK_THEME === 'cyber') {
+            kerbColorA = color(6, 182, 212, 230);
+            kerbColorB = color(99, 102, 241, 230);
+            asphaltColor = color(11, 16, 30);
+            centerLineColor = color(56, 189, 248, 160);
+        }
+    }
 
     // 1. ZONES DE DÉGAGEMENT (Léger halo d'ambiance autour de la piste)
     if (trackCenterPoints && trackCenterPoints.length > 0) {
@@ -52,7 +98,7 @@ function drawTrackSurface() {
 
     // 2. SURFACE DE L'ASPHALTE NOIR DE COURSE
     noStroke();
-    fill(20, 26, 38); // Asphalte anthracite F1
+    fill(asphaltColor);
     beginShape(TRIANGLE_STRIP);
     for (let i = 0; i <= len; i++) {
         let idx = i % len;
@@ -66,8 +112,8 @@ function drawTrackSurface() {
     const kerbThickness = 4.5;
 
     for (let i = 0; i < len; i++) {
-        let isRed = Math.floor(i / kerbBlockSize) % 2 === 0;
-        let c = isRed ? color(239, 68, 68, 220) : color(255, 255, 255, 220);
+        let isBlockA = Math.floor(i / kerbBlockSize) % 2 === 0;
+        let c = isBlockA ? kerbColorA : kerbColorB;
         let nextI = (i + 1) % len;
 
         // Vibreur intérieur

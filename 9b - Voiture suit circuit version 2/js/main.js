@@ -13,6 +13,10 @@ function setup() {
     let canvas = createCanvas(windowWidth, windowHeight);
     canvas.parent('canvas-container');
 
+    if (typeof BrainVisualizer !== 'undefined') {
+        brainVisualizer = new BrainVisualizer('neuralCanvas');
+    }
+
     setupTrack(true);
     resetTraining(true);
     initDynamicUI();
@@ -32,9 +36,18 @@ function draw() {
         updateSimulationStep();
     }
 
-    // Caméra centrée sur le leader si activé
+    // Caméra dynamique multi-modes (Overview, Follow leader, Chase cockpit)
     push();
-    if (FOCUS_BEST_CAR && bestCar && !bestCar.dead) {
+    if (CAMERA_MODE === 'follow' && bestCar && !bestCar.dead) {
+        let targetX = width / 2 - bestCar.pos.x;
+        let targetY = height / 2 - bestCar.pos.y;
+        translate(targetX, targetY);
+    } else if (CAMERA_MODE === 'chase' && bestCar && !bestCar.dead) {
+        let heading = (typeof bestCar.vel.heading === 'function') ? bestCar.vel.heading() : Math.atan2(bestCar.vel.y, bestCar.vel.x);
+        translate(width / 2, height * 0.62);
+        rotate(-heading - Math.PI / 2);
+        translate(-bestCar.pos.x, -bestCar.pos.y);
+    } else if (FOCUS_BEST_CAR && bestCar && !bestCar.dead) {
         let targetX = width / 2 - bestCar.pos.x;
         let targetY = height / 2 - bestCar.pos.y;
         translate(targetX, targetY);
@@ -117,6 +130,14 @@ function draw() {
 
     // 10. Mise à jour de la télémétrie dans le DOM et sur le canvas
     updateTelemetryUI();
+
+    // 11. Visualiseur de Cerveau Haute Fidélité & Actuateurs DOM
+    if (brainVisualizer) {
+        brainVisualizer.render(bestCar || (cars.length > 0 ? cars[0] : null));
+    }
+
+    // 12. Graphe miniature de fitness dans le dock inférieur
+    drawMiniFitnessGraph();
 }
 
 /**
@@ -740,6 +761,23 @@ function updateTelemetryUI() {
     if (elAvgFit) elAvgFit.innerText = Math.round(currentAvg);
     if (elDiversity) elDiversity.innerText = `${diversityPct}%`;
     if (elBestLap) elBestLap.innerText = bestLapTimeRecord ? `${bestLapTimeRecord.toFixed(2)}s` : '--';
+
+    let cockpitSpeed = document.getElementById('cockpitSpeedVal');
+    let cockpitLap = document.getElementById('cockpitLapVal');
+    let statGraphBest = document.getElementById('statGraphBest');
+
+    let activeCar = bestCar || (cars.length > 0 ? cars[0] : null);
+    if (activeCar && !activeCar.dead && cockpitSpeed) {
+        let mag = (typeof activeCar.vel.mag === 'function') ? activeCar.vel.mag() : Math.hypot(activeCar.vel.x, activeCar.vel.y);
+        cockpitSpeed.innerText = Math.round(mag * 26);
+        let curLapSeconds = ((activeCar.frameCount - activeCar.lapStartTime) / 60).toFixed(2);
+        if (cockpitLap) cockpitLap.innerText = `${curLapSeconds}s`;
+    } else if (cockpitSpeed) {
+        cockpitSpeed.innerText = '0';
+        if (cockpitLap) cockpitLap.innerText = '0.00s';
+    }
+
+    if (statGraphBest) statGraphBest.innerText = Math.round(bestFitnessRecord);
 }
 
 /**
@@ -876,6 +914,76 @@ function initDynamicUI() {
     link('btnLoadModel', 'click', () => {
         loadChampionModel();
     });
+
+    // 9. Contrôles de repliement des panneaux latéraux (Collapsible Docks)
+    link('btnToggleConfigPanel', 'click', () => {
+        CONFIG_PANEL_OPEN = !CONFIG_PANEL_OPEN;
+        const panel = document.getElementById('ai-config-panel');
+        const btn = document.getElementById('btnToggleConfigPanel');
+        if (panel) panel.classList.toggle('collapsed', !CONFIG_PANEL_OPEN);
+        if (btn) btn.innerText = CONFIG_PANEL_OPEN ? '◀' : '▶';
+    });
+
+    link('btnToggleBrainPanel', 'click', () => {
+        BRAIN_PANEL_OPEN = !BRAIN_PANEL_OPEN;
+        const panel = document.getElementById('ai-brain-panel');
+        const btn = document.getElementById('btnToggleBrainPanel');
+        if (panel) panel.classList.toggle('collapsed', !BRAIN_PANEL_OPEN);
+        if (btn) btn.innerText = BRAIN_PANEL_OPEN ? '▶' : '◀';
+    });
+
+    link('btnToggleBottomDock', 'click', () => {
+        BOTTOM_DOCK_OPEN = !BOTTOM_DOCK_OPEN;
+        const panel = document.getElementById('ai-bottom-dock');
+        const btn = document.getElementById('btnToggleBottomDock');
+        if (panel) panel.classList.toggle('collapsed', !BOTTOM_DOCK_OPEN);
+        if (btn) btn.innerText = BOTTOM_DOCK_OPEN ? '▼' : '▲';
+    });
+
+    // 10. Barre de caméra rapide (Overview, Follow, Chase)
+    const setCamMode = (mode) => {
+        CAMERA_MODE = mode;
+        ['btnCamOverview', 'btnCamFollow', 'btnCamChase'].forEach(id => {
+            document.getElementById(id)?.classList.remove('active');
+        });
+        if (mode === 'overview') document.getElementById('btnCamOverview')?.classList.add('active');
+        if (mode === 'follow') document.getElementById('btnCamFollow')?.classList.add('active');
+        if (mode === 'chase') document.getElementById('btnCamChase')?.classList.add('active');
+    };
+    link('btnCamOverview', 'click', () => setCamMode('overview'));
+    link('btnCamFollow', 'click', () => setCamMode('follow'));
+    link('btnCamChase', 'click', () => setCamMode('chase'));
+
+    // 11. Overlays rapides (Tags LiDAR)
+    link('btnToggleRayLabels', 'click', (e) => {
+        SHOW_RAY_LABELS = !SHOW_RAY_LABELS;
+        e.currentTarget?.classList.toggle('active', SHOW_RAY_LABELS);
+    });
+
+    // 12. Sélecteur de Mode (Training vs Championship)
+    link('btnModeTraining', 'click', () => {
+        GAME_MODE = 'training';
+        document.getElementById('btnModeTraining')?.classList.add('active');
+        document.getElementById('btnModeRace')?.classList.remove('active');
+    });
+
+    link('btnModeRace', 'click', () => {
+        GAME_MODE = 'championship';
+        document.getElementById('btnModeRace')?.classList.add('active');
+        document.getElementById('btnModeTraining')?.classList.remove('active');
+        loadChampionModel();
+    });
+
+    // 13. Sélecteur de Thème de Circuit
+    link('themeSelect', 'change', (e) => {
+        TRACK_THEME = e.target.value;
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.className = `theme-${TRACK_THEME}`;
+        }
+    });
+
+    // 14. Initialisation du Modal Pédagogique Interactif
+    initEducationalModal();
 
     // Génération initiale des sliders de couches cachées
     renderDynamicLayerSliders();
@@ -1025,4 +1133,224 @@ function keyPressed() {
     } else if (key === 'l' || key === 'L') {
         loadChampionModel();
     }
+}
+
+/**
+ * ============================================================================
+ * MINI GRAPHE DE FITNESS DANS LE DOCK INFÉRIEUR (HTML5 Canvas 2D)
+ * ============================================================================
+ */
+function drawMiniFitnessGraph() {
+    if (typeof document === 'undefined') return;
+    const canvas = document.getElementById('fitnessGraphCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Grille millimétrée
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    for (let k = 1; k <= 3; k++) {
+        let gy = (h * k) / 4;
+        ctx.beginPath();
+        ctx.moveTo(0, gy);
+        ctx.lineTo(w, gy);
+        ctx.stroke();
+    }
+
+    if (!generationHistory || generationHistory.length < 2) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText("Données dès la Génération 2...", w / 2, h / 2 + 3);
+        return;
+    }
+
+    let maxFit = Math.max(100, ...generationHistory.map(g => Math.max(g.bestFitness, g.avgFitness)));
+    let n = generationHistory.length;
+    let stepX = w / Math.max(1, n - 1);
+
+    // 1. Courbe Moyenne (Cyan)
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        let x = i * stepX;
+        let y = h - (generationHistory[i].avgFitness / maxFit) * (h - 10) - 5;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // 2. Courbe Best (Émeraude)
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        let x = i * stepX;
+        let y = h - (generationHistory[i].bestFitness / maxFit) * (h - 10) - 5;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+}
+
+/**
+ * ============================================================================
+ * MODAL PÉDAGOGIQUE INTERACTIF : "HOW AI WORKS" (6 Étapes)
+ * ============================================================================
+ */
+let currentPipelineStep = 1;
+
+function initEducationalModal() {
+    if (typeof document === 'undefined') return;
+
+    const modal = document.getElementById('howAiWorksModal');
+    const btnOpen = document.getElementById('btnHowAiWorks');
+    const btnClose = document.getElementById('btnCloseModal');
+    const backdrop = modal ? modal.querySelector('.modal-backdrop') : null;
+    const btnPrev = document.getElementById('btnPrevStep');
+    const btnNext = document.getElementById('btnNextStep');
+
+    if (!modal) return;
+
+    const openModal = () => {
+        modal.classList.remove('hidden');
+        renderPipelineStep(currentPipelineStep);
+    };
+
+    const closeModal = () => {
+        modal.classList.add('hidden');
+    };
+
+    if (btnOpen) btnOpen.addEventListener('click', openModal);
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (backdrop) backdrop.addEventListener('click', closeModal);
+
+    // Navigation étapes
+    const stepItems = modal.querySelectorAll('.step-item');
+    stepItems.forEach(item => {
+        item.addEventListener('click', () => {
+            let step = parseInt(item.getAttribute('data-step')) || 1;
+            currentPipelineStep = step;
+            renderPipelineStep(currentPipelineStep);
+        });
+    });
+
+    if (btnPrev) {
+        btnPrev.addEventListener('click', () => {
+            if (currentPipelineStep > 1) {
+                currentPipelineStep--;
+                renderPipelineStep(currentPipelineStep);
+            }
+        });
+    }
+
+    if (btnNext) {
+        btnNext.addEventListener('click', () => {
+            if (currentPipelineStep < 6) {
+                currentPipelineStep++;
+                renderPipelineStep(currentPipelineStep);
+            } else {
+                closeModal();
+            }
+        });
+    }
+
+    // Rendu initial
+    renderPipelineStep(1);
+}
+
+function renderPipelineStep(step) {
+    if (typeof document === 'undefined') return;
+    const container = document.getElementById('pipelineStepContent');
+    const modal = document.getElementById('howAiWorksModal');
+    if (!container || !modal) return;
+
+    // Mise à jour des classes active sur le stepper
+    const stepItems = modal.querySelectorAll('.step-item');
+    stepItems.forEach(item => {
+        let s = parseInt(item.getAttribute('data-step'));
+        item.classList.toggle('active', s === step);
+    });
+
+    const stepDots = document.getElementById('stepDots');
+    if (stepDots) {
+        stepDots.innerHTML = [1, 2, 3, 4, 5, 6].map(i => `<span class="step-dot ${i === step ? 'active' : ''}"></span>`).join('');
+    }
+
+    const btnNext = document.getElementById('btnNextStep');
+    if (btnNext) {
+        btnNext.innerText = step === 6 ? "TERMINER & TESTER EN DIRECT 🚀" : "ÉTAPE SUIVANTE ▶";
+    }
+
+    const stepsData = [
+        {
+            title: "1. PERCEPTION LIDAR (VISION LASER 2D)",
+            badge: "SENSORS",
+            formula: "p_hit = p_car + t · d_ray,   t ∈ [0, 1]",
+            desc: "Chaque véhicule projette une couronne de télémètres laser (de 3 à 15 rayons) sur un champ de vision angulaire (FOV). Chaque rayon calcule en temps réel son intersection de segment avec les rails du circuit selon le modèle de détection vectoriel.",
+            insight: "💡 Pédagogie : La longueur du rayon affiché à l'écran correspond exactement à la distance réelle perçue par le véhicule. S'il n'y a pas d'obstacle, le rayon s'arrête à sa portée maximale."
+        },
+        {
+            title: "2. NORMALISATION MATHÉMATIQUE DES ENTRÉES",
+            badge: "INPUTS",
+            formula: "Input_i = max(0, 1 - Distance_i / Portée_Max)",
+            desc: "Pour que le réseau de neurones apprenne de manière stable, les distances physiques en pixels sont converties en entrées adimensionnelles normalisées entre 0.0 et 1.0. Une valeur de 1.0 indique un impact immédiat (danger critique rouge) et 0.0 une piste dégagée (vert).",
+            insight: "💡 Règle absolue : Le nombre de neurones de la couche d'entrée est STRICTEMENT égal au nombre de rayons configurés (ex: 5 rayons = 5 neurones d'entrée)."
+        },
+        {
+            title: "3. PROPAGATION AVANT DANS LE RÉSEAU NEURONAL (MLP)",
+            badge: "BRAIN FEEDFORWARD",
+            formula: "a^(l+1) = σ( W^(l) · a^(l) + b^(l) ),   σ(z) = 1 / (1 + e^-z)",
+            desc: "Le cerveau est un Perceptron Multicouche (MLP) paramétrable (1 à 5 couches cachées). Les signaux se propagent couche par couche à travers les matrices de poids W et les vecteurs de biais b. Les connexions cyan sont excitatrices (poids > 0), les connexions roses sont inhibitrices (poids < 0).",
+            insight: "💡 Visualisation : Dans le panneau de droite, vous pouvez observer les impulsions électriques circuler en temps réel des capteurs vers les actuateurs."
+        },
+        {
+            title: "4. MODÈLE DE STEERING & LOCOMOTION DE CRAIG REYNOLDS",
+            badge: "ACTUATION",
+            formula: "Steering = limit( v_desired - v_current, maxForce )",
+            desc: "La couche de sortie fournit deux activations : [Braquage, Poussée]. Conformément à l'article fondateur de Craig W. Reynolds (GDC 1999), l'IA ne déplace pas la voiture par téléportation : elle calcule une force de pilotage (steering) appliquée à la masse du véhicule selon l'intégration d'Euler.",
+            insight: "💡 Locomotion : a = a + F/m,  v = v + a (plafonné à maxSpeed),  p = p + v. Cela garantit un comportement physique réaliste avec inertie et dérapage."
+        },
+        {
+            title: "5. FONCTION DE FITNESS & SURVIE SÉLECTIVE",
+            badge: "FITNESS",
+            formula: "Score = (Checkpoints × 1000) + Distance - Pénalité_Camping",
+            desc: "La fitness mesure l'aptitude d'un individu à piloter sur le circuit. Plus une voiture franchit de checkpoints rapidement sans percuter de mur, plus sa note de fitness explose. Un système anti-camping élimine immédiatement les individus tournant en rond sur eux-mêmes.",
+            insight: "💡 Objectif : Fournir un gradient de récompense continu pour guider la sélection naturelle vers la trajectoire de course idéale."
+        },
+        {
+            title: "6. NEURO-ÉVOLUTION & SÉLECTION GÉNÉTIQUE",
+            badge: "GENETIC ALGORITHM",
+            formula: "W_mutated = W + N(0, σ_mutation)",
+            desc: "À chaque fin de génération : 1. Le meilleur pilote absolu (Champion) est préservé intact sans mutation (Élitisme strict). 2. Les autres parents sont choisis par sélection par tournoi. 3. Une mutation gaussienne est injectée dans les poids synaptiques pour explorer de nouvelles trajectoires.",
+            insight: "💡 Résultat : En 10 à 15 générations seulement, la population passe d'un chaos total à une meute de bolides négociant les virages comme des pilotes de F1 professionnels."
+        }
+    ];
+
+    const data = stepsData[step - 1];
+    container.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+            <h3 style="font-size: 0.95rem; font-weight: 800; color: #fff;">${data.title}</h3>
+            <span style="font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); padding: 2px 8px; border-radius: 4px;">
+                ${data.badge}
+            </span>
+        </div>
+        <div style="background: rgba(10, 15, 25, 0.7); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 10px; text-align: center;">
+            <span style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #10b981;">
+                ${data.formula}
+            </span>
+        </div>
+        <p style="font-size: 0.78rem; line-height: 1.5; color: #cbd5e1;">
+            ${data.desc}
+        </p>
+        <div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; padding: 8px 10px; border-radius: 0 6px 6px 0; font-size: 0.72rem; color: #a7f3d0;">
+            ${data.insight}
+        </div>
+    `;
 }

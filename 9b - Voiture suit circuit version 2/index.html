@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>9b — AI Vehicle Training & Neuroévolution Racing</title>
+    <title>AI AUTONOMOUS RACING LAB — Futuristic Neuro-Evolution Simulator</title>
 
     <link rel="stylesheet" href="css/style.css">
 
@@ -20,46 +20,152 @@
     <script src="js/Track.js"></script>
     <script src="js/Car.js"></script>
     <script src="js/Genetic.js"></script>
+    <script src="js/BrainVisualizer.js"></script>
     <script src="js/main.js"></script>
 </head>
 
-<body>
-    <!-- Panneau de Contrôle Principal Haute Technologie -->
-    <aside id="ui" class="cyber-panel">
-        <header class="panel-header">
-            <div class="header-title">
-                <span class="icon">🏎️</span>
-                <div>
-                    <h1>AI VEHICLE TRAINING</h1>
-                    <span class="sub-header">Steering Behaviours & Neuro-Évolution</span>
-                </div>
+<body class="theme-tokyo">
+    <!-- ===================================================================== -->
+    <!-- 1. HEADER HIGH-TECH SUPERIEUR (AI AUTONOMOUS RACING LAB) -->
+    <!-- ===================================================================== -->
+    <header id="lab-header" class="lab-header">
+        <div class="header-left">
+            <div class="lab-logo">
+                <span class="logo-pulse"></span>
+                <span class="logo-icon">🏎️</span>
             </div>
-            <!-- Badge de Topologie en temps réel -->
-            <div id="topologyBadge" class="topology-badge" title="Topologie active du réseau">
-                5 → 10 → 6 → 2
+            <div class="lab-title-group">
+                <h1 class="lab-title">AI AUTONOMOUS RACING LAB</h1>
+                <span class="lab-subtitle">NEURO-EVOLUTION & STEERING BEHAVIORS SIMULATOR</span>
             </div>
-        </header>
 
-        <div class="panel-body">
-            <!-- 1. VISION (Capteurs lasers) -->
+            <!-- Sélecteur de Mode : ENTRAÎNEMENT vs CHAMPIONNAT -->
+            <div class="mode-switch-wrapper">
+                <button id="btnModeTraining" class="mode-pill active" title="Mode Recherche & Apprentissage continu">
+                    <span class="pill-dot"></span> 🔬 TRAINING MODE
+                </button>
+                <button id="btnModeRace" class="mode-pill" title="Mode Grand Prix : Seuls les meilleurs s'affrontent">
+                    <span class="pill-dot red"></span> 🏆 CHAMPIONSHIP
+                </button>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <!-- Badges KPI en direct -->
+            <div class="kpi-pill" title="Numéro de la génération actuelle">
+                <span class="kpi-label">GEN</span>
+                <span id="statGen" class="kpi-val highlight">1</span>
+            </div>
+            <div class="kpi-pill" title="Véhicules actuellement en piste">
+                <span class="kpi-label">ALIVE</span>
+                <span id="statAlive" class="kpi-val">30 / 30</span>
+            </div>
+            <div class="kpi-pill" title="Meilleur score de fitness atteint">
+                <span class="kpi-label">BEST FIT</span>
+                <span id="statBestFit" class="kpi-val primary">0</span>
+            </div>
+            <div class="kpi-pill" title="Topologie active du réseau">
+                <span class="kpi-label">ARCH</span>
+                <span id="topologyBadge" class="kpi-val cyan-code">5 → 10 → 6 → 2</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <!-- Bouton Démo Champion Express -->
+            <button id="btnDemoChampion" class="lab-action-btn champion-btn" title="Activer instantanément le champion pré-entraîné">
+                ⚡ DÉMO CHAMPION
+            </button>
+
+            <!-- Guide Pédagogique Interactif -->
+            <button id="btnHowAiWorks" class="lab-action-btn guide-btn" title="Comprendre le fonctionnement complet de l'IA pas à pas">
+                🎓 HOW AI WORKS
+            </button>
+
+            <!-- Menu Sauvegardes & JSON -->
+            <div class="quick-file-actions">
+                <button id="btnSaveModel" class="icon-action-btn" title="Sauvegarder le cerveau champion en JSON (Touche S)">
+                    💾
+                </button>
+                <button id="btnLoadModel" class="icon-action-btn" title="Charger un cerveau champion (Touche L)">
+                    📂
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- 2. SCÈNE CENTRALE : CANVAS DE SIMULATION & BARRE FLOTTANTE -->
+    <!-- ===================================================================== -->
+    <main id="simulation-stage">
+        <!-- Canvas P5.js Container -->
+        <div id="canvas-container"></div>
+
+        <!-- Floating Quick Viewport Toolbar (Caméra, Overlays, Thème) -->
+        <div id="quick-view-toolbar" class="quick-toolbar">
+            <div class="toolbar-group">
+                <span class="tb-title">CAMÉRA</span>
+                <button id="btnCamOverview" class="tb-btn active" title="Vue globale du circuit (Touche C)">🌐 Global</button>
+                <button id="btnCamFollow" class="tb-btn" title="Suivi fluide du leader (Touche F)">🎯 Follow</button>
+                <button id="btnCamChase" class="tb-btn" title="Caméra embarquée dynamique">🏎️ Chase</button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+                <span class="tb-title">OVERLAYS</span>
+                <button id="btnToggleRadar" class="tb-btn active" title="Afficher/Masquer les jauges LiDAR (Touche V)">📡 LiDAR</button>
+                <button id="btnToggleRayLabels" class="tb-btn active" title="Afficher/Masquer les valeurs métriques des rayons">🏷️ Distances</button>
+                <button id="btnToggleMinimap" class="tb-btn active" title="Afficher/Masquer le radar minimap (Touche M)">🗺️ Minimap</button>
+                <button id="btnToggleDebug" class="tb-btn" title="Afficher/Masquer les forces & checkpoints (Touche D)">🛠️ Debug [D]</button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+                <span class="tb-title">THÈME CIRCUIT</span>
+                <select id="themeSelect" class="cyber-select-mini">
+                    <option value="tokyo" selected>🌃 Neo Tokyo (Cyberpunk)</option>
+                    <option value="mars">🪐 Mars Ring (Sci-Fi)</option>
+                    <option value="cyber">⚡ Cyber City (Cobalt)</option>
+                </select>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- 3. PANNEAU DE GAUCHE : AI CONFIGURATION (Collapsible) -->
+    <!-- ===================================================================== -->
+    <aside id="ai-config-panel" class="cyber-dock dock-left">
+        <div class="dock-header">
+            <div class="dock-title">
+                <span class="dock-icon">🎛️</span>
+                <h2>AI CONFIGURATION</h2>
+            </div>
+            <button id="btnToggleConfigPanel" class="dock-collapse-btn" title="Réduire/Agrandir le panneau de configuration">
+                ◀
+            </button>
+        </div>
+
+        <div class="dock-content">
+            <!-- 1. SENSORS (Capteurs LiDAR) -->
             <section class="config-card">
                 <div class="card-header">
                     <span class="card-icon">📡</span>
-                    <h3>VISION & CAPTEURS</h3>
+                    <h3>SENSORS (LIDAR VISION)</h3>
                 </div>
                 <div class="card-content">
                     <div class="control-row">
                         <div class="label-info">
-                            <label for="raysSlider">Nombre de Rayons :</label>
+                            <label for="raysSlider">Number of Rays :</label>
                             <span id="raysVal" class="value-tag primary">5</span>
                         </div>
                         <input type="range" id="raysSlider" min="3" max="15" value="5" step="1">
-                        <span class="input-hint">Définit le nombre d'entrées du réseau (1 rayon = 1 neurone INPUT)</span>
+                        <span class="input-hint">1 rayon = 1 neurone d'entrée (Inputs = Rays)</span>
                     </div>
 
                     <div class="control-row">
                         <div class="label-info">
-                            <label for="sightSlider">Portée Laser :</label>
+                            <label for="sightSlider">Ray Length (Portée) :</label>
                             <span id="sightVal" class="value-tag">150 px</span>
                         </div>
                         <input type="range" id="sightSlider" min="70" max="350" value="150" step="10">
@@ -67,7 +173,7 @@
 
                     <div class="control-row">
                         <div class="label-info">
-                            <label for="fovSlider">Champ de Vision (FOV) :</label>
+                            <label for="fovSlider">Field of View (FOV) :</label>
                             <span id="fovVal" class="value-tag">135°</span>
                         </div>
                         <input type="range" id="fovSlider" min="45" max="220" value="135" step="5">
@@ -75,27 +181,27 @@
                 </div>
             </section>
 
-            <!-- 2. NETWORK (Topologie multicouche) -->
+            <!-- 2. NEURAL NETWORK TOPOLOGY -->
             <section class="config-card featured">
                 <div class="card-header">
                     <span class="card-icon">🧠</span>
-                    <h3>RÉSEAU DE NEURONES (TOPOLOGIE)</h3>
+                    <h3>NEURAL NETWORK (TOPOLOGY)</h3>
                 </div>
                 <div class="card-content">
                     <div class="control-row">
                         <div class="label-info">
-                            <label for="hiddenLayersSlider">Nombre de Couches Cachées :</label>
+                            <label for="hiddenLayersSlider">Hidden Layers (1 à 5) :</label>
                             <span id="hiddenLayersVal" class="value-tag accent">2</span>
                         </div>
                         <input type="range" id="hiddenLayersSlider" min="1" max="5" value="2" step="1">
                     </div>
 
-                    <!-- Conteneur généré dynamiquement pour chaque couche cachée (1 à 5 sliders) -->
+                    <!-- Sliders générés dynamiquement pour chaque couche -->
                     <div id="dynamicLayersContainer" class="dynamic-layers-wrapper">
-                        <!-- Généré par JavaScript en fonction du nombre de couches et de rayons -->
+                        <!-- Rempli par JavaScript -->
                     </div>
 
-                    <!-- Affichage Prévisualisation de la topologie configurée -->
+                    <!-- Prévisualisation de la topologie -->
                     <div class="topology-preview-box">
                         <span class="preview-label">Topologie configurée :</span>
                         <span id="pendingTopologyDisplay" class="preview-topology">5 → 10 → 6 → 2</span>
@@ -108,11 +214,11 @@
                 </div>
             </section>
 
-            <!-- 3. VEHICLE DYNAMICS (Vitesse & Braquage) -->
+            <!-- 3. VEHICLE DYNAMICS -->
             <section class="config-card">
                 <div class="card-header">
                     <span class="card-icon">⚙️</span>
-                    <h3>DYNAMIQUE DU VÉHICULE</h3>
+                    <h3>VEHICLE DYNAMICS</h3>
                 </div>
                 <div class="card-content">
                     <div class="control-row">
@@ -125,7 +231,7 @@
 
                     <div class="control-row">
                         <div class="label-info">
-                            <label for="forceSlider">Max Force (Steering) :</label>
+                            <label for="forceSlider">Max Steering Force :</label>
                             <span id="forceVal" class="value-tag">0.50</span>
                         </div>
                         <input type="range" id="forceSlider" min="0.1" max="1.5" value="0.50" step="0.05">
@@ -133,32 +239,16 @@
                 </div>
             </section>
 
-            <!-- 4. TRAINING & TELEMETRY (Entraînement & Télémétrie) -->
+            <!-- 4. GENETIC EVOLUTION PARAMETERS -->
             <section class="config-card">
                 <div class="card-header">
                     <span class="card-icon">🧬</span>
-                    <h3>CONTRÔLE DE L'ENTRAÎNEMENT</h3>
+                    <h3>GENETIC EVOLUTION</h3>
                 </div>
                 <div class="card-content">
-                    <!-- Vitesse de simulation -->
                     <div class="control-row">
                         <div class="label-info">
-                            <label for="simSpeedSelect">Simulation Speed :</label>
-                        </div>
-                        <select id="simSpeedSelect" class="cyber-select">
-                            <option value="0.5">0.5x (Ralenti)</option>
-                            <option value="1" selected>1x (Temps Réel)</option>
-                            <option value="2">2x (Accéléré)</option>
-                            <option value="5">5x (Rapide)</option>
-                            <option value="10">10x (Ultra Rapide)</option>
-                            <option value="20">20x (Mode Éclair)</option>
-                        </select>
-                    </div>
-
-                    <!-- Paramètres génétiques -->
-                    <div class="control-row">
-                        <div class="label-info">
-                            <label for="popSlider">Population :</label>
+                            <label for="popSlider">Population Size :</label>
                             <span id="popVal" class="value-tag">30</span>
                         </div>
                         <input type="range" id="popSlider" min="10" max="60" value="30" step="5">
@@ -174,119 +264,276 @@
 
                     <div class="control-row">
                         <div class="label-info">
-                            <label for="mutAmountSlider">Mutation Amount :</label>
+                            <label for="mutAmountSlider">Mutation Amplitude :</label>
                             <span id="mutAmountVal" class="value-tag">0.15</span>
                         </div>
                         <input type="range" id="mutAmountSlider" min="0.02" max="0.50" value="0.15" step="0.01">
                     </div>
+                </div>
+            </section>
 
-                    <!-- Télémétrie en temps réel -->
-                    <div class="telemetry-box">
-                        <div class="telemetry-item">
-                            <span class="tel-label">Génération :</span>
-                            <span id="statGen" class="tel-value highlight">1</span>
+            <!-- Encadré Raccourcis Clavier -->
+            <details class="shortcuts-accordion">
+                <summary>⌨️ RACCOURCIS CLAVIER DU PILOTE</summary>
+                <div class="shortcuts-list">
+                    <div><kbd>ESPACE</kbd> : Pause / Reprendre</div>
+                    <div><kbd>D</kbd> : Mode Debug (Forces & Rayons)</div>
+                    <div><kbd>N</kbd> : Afficher/Masquer Cerveau</div>
+                    <div><kbd>H</kbd> : Graphe de Fitness</div>
+                    <div><kbd>V</kbd> : Jauges LiDAR</div>
+                    <div><kbd>M</kbd> : Minimap Radar</div>
+                    <div><kbd>F</kbd> : Suivi Caméra Leader</div>
+                    <div><kbd>G</kbd> : Forcer Génération Suivante</div>
+                    <div><kbd>R</kbd> : Réinitialiser la Course</div>
+                    <div><kbd>S</kbd> / <kbd>L</kbd> : Sauvegarder / Charger JSON</div>
+                </div>
+            </details>
+        </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- 4. PANNEAU DE DROITE : BRAIN VISUALIZER & OUTPUT ACTUATORS (Collapsible) -->
+    <!-- ===================================================================== -->
+    <aside id="ai-brain-panel" class="cyber-dock dock-right">
+        <div class="dock-header">
+            <button id="btnToggleBrainPanel" class="dock-collapse-btn" title="Réduire/Agrandir le visualiseur de cerveau">
+                ▶
+            </button>
+            <div class="dock-title">
+                <span class="dock-icon">🧠</span>
+                <h2>BRAIN VISUALIZER</h2>
+            </div>
+        </div>
+
+        <div class="dock-content">
+            <!-- État du Véhicule Inspecté -->
+            <div class="inspector-card">
+                <div class="inspector-status">
+                    <span class="target-indicator"></span>
+                    <span class="target-name">LEADER VEHICLE #01</span>
+                    <span id="brainTargetState" class="target-badge active">ALIVE</span>
+                </div>
+            </div>
+
+            <!-- Canvas dédié au Réseau Neuronal Interactif avec flux synaptique -->
+            <div class="brain-canvas-wrapper">
+                <canvas id="neuralCanvas" width="340" height="230"></canvas>
+                <div class="brain-flow-indicator">
+                    <span>INPUTS (LIDAR)</span>
+                    <span class="flow-arrow">➔➔➔</span>
+                    <span>OUTPUTS (ACTUATORS)</span>
+                </div>
+            </div>
+
+            <!-- Section Jauges des Décisions / Actuateurs (Outputs) -->
+            <section class="config-card">
+                <div class="card-header">
+                    <span class="card-icon">⚡</span>
+                    <h3>ACTUATOR OUTPUTS (DÉCISIONS TEMPS RÉEL)</h3>
+                </div>
+                <div class="card-content">
+                    <!-- Jauge de Braquage (Steering) -->
+                    <div class="actuator-gauge-group">
+                        <div class="actuator-label-row">
+                            <span class="act-name">STEERING (BRAQUAGE)</span>
+                            <span id="actuatorSteerVal" class="act-val highlight">0.00</span>
                         </div>
-                        <div class="telemetry-item">
-                            <span class="tel-label">En Vie :</span>
-                            <span id="statAlive" class="tel-value">30 / 30</span>
+                        <div class="gauge-bipolar-track">
+                            <div class="gauge-center-mark"></div>
+                            <div id="gaugeSteerBar" class="gauge-bipolar-fill" style="width: 0%; left: 50%;"></div>
                         </div>
-                        <div class="telemetry-item">
-                            <span class="tel-label">Best Fitness :</span>
-                            <span id="statBestFit" class="tel-value primary">0</span>
-                        </div>
-                        <div class="telemetry-item">
-                            <span class="tel-label">Avg Fitness :</span>
-                            <span id="statAvgFit" class="tel-value">0</span>
-                        </div>
-                        <div class="telemetry-item">
-                            <span class="tel-label">Diversité :</span>
-                            <span id="statDiversity" class="tel-value highlight">100%</span>
-                        </div>
-                        <div class="telemetry-item">
-                            <span class="tel-label">Best Tour :</span>
-                            <span id="statBestLap" class="tel-value">--</span>
+                        <div class="gauge-sublabels">
+                            <span>◀ GAUCHE</span>
+                            <span>CENTRE</span>
+                            <span>DROITE ▶</span>
                         </div>
                     </div>
 
-                    <!-- Bouton Démo Champion Instantanée -->
-                    <button id="btnDemoChampion" class="btn btn-champion" title="Charge instantanément le cerveau champion pré-entraîné (5 → 10 → 6 → 2)">
-                        🏆 ⚡ DÉMO CHAMPION (AUTO)
-                    </button>
-
-                    <!-- Boutons de Contrôle d'Entraînement -->
-                    <div class="training-btn-grid" style="margin-top: 8px;">
-                        <button id="btnStart" class="btn btn-success" title="Démarrer l'entraînement">
-                            ▶ START
-                        </button>
-                        <button id="btnPause" class="btn btn-warning" title="Mettre en pause (Touche Espace)">
-                            ⏸ PAUSE
-                        </button>
-                        <button id="btnReset" class="btn btn-danger" title="Réinitialiser l'entraînement (Touche R)">
-                            🔄 RESET
-                        </button>
-                        <button id="btnNextGen" class="btn btn-secondary" title="Forcer la génération suivante (Touche G)">
-                            ⚡ FORCE GEN
-                        </button>
-                    </div>
-
-                    <!-- Options de Visualisation & Télémétrie In-Game -->
-                    <div class="utility-btn-row">
-                        <button id="btnToggleNN" class="btn-sm" title="Afficher/Masquer le schéma du réseau (Touche N)">
-                            🧠 Réseau [N]
-                        </button>
-                        <button id="btnToggleGraph" class="btn-sm" title="Afficher/Masquer le graphe de fitness (Touche H)">
-                            📈 Graphe [H]
-                        </button>
-                        <button id="btnToggleRadar" class="btn-sm" title="Afficher/Masquer le radar LiDAR (Touche V)">
-                            📡 LiDAR [V]
-                        </button>
-                        <button id="btnToggleMinimap" class="btn-sm" title="Afficher/Masquer la minimap (Touche M)">
-                            🗺️ Radar [M]
-                        </button>
-                    </div>
-
-                    <!-- Sauvegarde & Debug -->
-                    <div class="utility-btn-row" style="margin-top: 4px;">
-                        <button id="btnToggleDebug" class="btn-sm" title="Activer/Désactiver le mode debug (Touche D)">
-                            🛠 Debug [D]
-                        </button>
-                        <button id="btnSaveModel" class="btn-sm" title="Sauvegarder le champion en JSON (Touche S)">
-                            💾 Sauver [S]
-                        </button>
-                        <button id="btnLoadModel" class="btn-sm" title="Charger un champion (Touche L)">
-                            📂 Charger [L]
-                        </button>
-                    </div>
-
-                    <!-- Encadré Déroulant des Raccourcis Clavier -->
-                    <details class="shortcuts-accordion">
-                        <summary>⌨️ AIDE RACCOURCIS CLAVIER</summary>
-                        <div class="shortcuts-list">
-                            <div><kbd>ESPACE</kbd> : Pause / Reprise</div>
-                            <div><kbd>D</kbd> : Mode Debug (Forces & Rayons)</div>
-                            <div><kbd>N</kbd> : Visualiseur Cerveau</div>
-                            <div><kbd>H</kbd> : Graphe de Fitness</div>
-                            <div><kbd>V</kbd> : Jauges LiDAR</div>
-                            <div><kbd>M</kbd> : Minimap Radar Circuit</div>
-                            <div><kbd>F</kbd> : Suivi Caméra Leader</div>
-                            <div><kbd>G</kbd> : Forcer Génération Suivante</div>
-                            <div><kbd>R</kbd> : Réinitialiser la Course</div>
-                            <div><kbd>S</kbd> / <kbd>L</kbd> : Sauver / Charger JSON</div>
+                    <!-- Jauge d'Accélération (Thrust) -->
+                    <div class="actuator-gauge-group" style="margin-top: 14px;">
+                        <div class="actuator-label-row">
+                            <span class="act-name">THRUST (ACCÉLÉRATION)</span>
+                            <span id="actuatorThrustVal" class="act-val primary">0%</span>
                         </div>
-                    </details>
+                        <div class="gauge-unipolar-track">
+                            <div id="gaugeThrustBar" class="gauge-unipolar-fill" style="width: 50%;"></div>
+                        </div>
+                        <div class="gauge-sublabels">
+                            <span>0% (STOP)</span>
+                            <span>50%</span>
+                            <span>100% (BOOST)</span>
+                        </div>
+                    </div>
+
+                    <!-- Décision Explicable résumée -->
+                    <div class="decision-summary-box">
+                        <span class="dec-title">IA ACTION :</span>
+                        <span id="actuatorDecisionText" class="dec-text">EN LIGNE DROITE — PLEIN GAZ</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Table compacte des Rayons LiDAR -->
+            <section class="config-card">
+                <div class="card-header">
+                    <span class="card-icon">📡</span>
+                    <h3>PERCEPTION LIDAR INSTANTANÉE</h3>
+                </div>
+                <div class="card-content">
+                    <div id="lidarReadingsList" class="lidar-readings-grid">
+                        <!-- Injecté dynamiquement par JS -->
+                    </div>
                 </div>
             </section>
         </div>
-
-        <footer class="panel-footer">
-            <span class="legend-dot green"></span> Leader
-            <span class="legend-dot cyan"></span> Peloton
-            <span class="legend-dot red"></span> Mur / Danger
-        </footer>
     </aside>
 
-    <!-- Canvas P5.js Container -->
-    <div id="canvas-container"></div>
+    <!-- ===================================================================== -->
+    <!-- 5. DOCK INFÉRIEUR : TELEMETRY, FITNESS GRAPH & COMMAND BAR -->
+    <!-- ===================================================================== -->
+    <footer id="ai-bottom-dock" class="cyber-dock dock-bottom">
+        <button id="btnToggleBottomDock" class="dock-collapse-bottom-btn" title="Réduire/Agrandir la barre de télémétrie">
+            ▼
+        </button>
+
+        <div class="bottom-dock-inner">
+            <!-- 1. Télémétrie Cockpit -->
+            <div class="dock-column telemetry-column">
+                <div class="dock-section-title">🏎️ TÉLÉMÉTRIE VÉHICULE</div>
+                <div class="telemetry-grid">
+                    <div class="tel-kpi-card">
+                        <span class="kpi-num" id="cockpitSpeedVal">0</span>
+                        <span class="kpi-unit">KM/H</span>
+                        <span class="kpi-desc">VITESSE LEADER</span>
+                    </div>
+                    <div class="tel-kpi-card">
+                        <span class="kpi-num" id="cockpitLapVal">0.00s</span>
+                        <span class="kpi-unit">SEC</span>
+                        <span class="kpi-desc">CHRONO TOUR</span>
+                    </div>
+                    <div class="tel-kpi-card">
+                        <span class="kpi-num" id="statBestLap">--</span>
+                        <span class="kpi-unit">SEC</span>
+                        <span class="kpi-desc">RECORD PISTE</span>
+                    </div>
+                    <div class="tel-kpi-card">
+                        <span class="kpi-num" id="statDiversity">100%</span>
+                        <span class="kpi-unit">GEN</span>
+                        <span class="kpi-desc">DIVERSITÉ ADN</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Graphe d'Évolution de Fitness -->
+            <div class="dock-column graph-column">
+                <div class="dock-section-title">
+                    <span>📈 ÉVOLUTION FITNESS (TEMPS RÉEL)</span>
+                    <div class="graph-legend-pills">
+                        <span class="legend-pill green">● Best : <b id="statGraphBest">0</b></span>
+                        <span class="legend-pill cyan">● Moy : <b id="statAvgFit">0</b></span>
+                    </div>
+                </div>
+                <div class="fitness-canvas-box">
+                    <canvas id="fitnessGraphCanvas" width="340" height="95"></canvas>
+                </div>
+            </div>
+
+            <!-- 3. Contrôles d'Entraînement & Time Warp -->
+            <div class="dock-column controls-column">
+                <div class="dock-section-title">⏱️ CONTRÔLE SIMULATION</div>
+                <div class="sim-speed-wrapper">
+                    <label for="simSpeedSelect">VITESSE :</label>
+                    <select id="simSpeedSelect" class="cyber-select-mini">
+                        <option value="0.5">0.5x (Ralenti)</option>
+                        <option value="1" selected>1x (Temps Réel)</option>
+                        <option value="2">2x (Accéléré)</option>
+                        <option value="5">5x (Rapide)</option>
+                        <option value="10">10x (Ultra Rapide)</option>
+                        <option value="20">20x (Mode Éclair)</option>
+                    </select>
+                </div>
+
+                <div class="sim-action-buttons">
+                    <button id="btnStart" class="btn btn-success" title="Lancer la simulation">▶ RUN</button>
+                    <button id="btnPause" class="btn btn-warning" title="Mettre en pause (Espace)">⏸ PAUSE</button>
+                    <button id="btnNextGen" class="btn btn-secondary" title="Forcer la génération suivante (G)">⚡ NEXT GEN</button>
+                    <button id="btnReset" class="btn btn-danger" title="Réinitialiser tout (R)">🔄 RESET</button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- 6. MODAL INTERACTIF : "HOW AI WORKS" (Pipeline Pédagogique) -->
+    <!-- ===================================================================== -->
+    <div id="howAiWorksModal" class="cyber-modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-card">
+            <header class="modal-header">
+                <div class="modal-title-group">
+                    <span class="modal-icon">🎓</span>
+                    <div>
+                        <h2>COMMENT FONCTIONNE L'IA AUTONOME DU VÉHICULE ?</h2>
+                        <span class="modal-subtitle">Pipeline Pédagogique Complet : Des Capteurs à la Neuro-Évolution</span>
+                    </div>
+                </div>
+                <button id="btnCloseModal" class="modal-close-btn">&times;</button>
+            </header>
+
+            <div class="modal-body">
+                <!-- Navigation des étapes du pipeline -->
+                <div class="pipeline-stepper">
+                    <div class="step-item active" data-step="1">
+                        <span class="step-num">1</span>
+                        <span class="step-title">Perception LiDAR</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-item" data-step="2">
+                        <span class="step-num">2</span>
+                        <span class="step-title">Normalisation Inputs</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-item" data-step="3">
+                        <span class="step-num">3</span>
+                        <span class="step-title">Réseau Neuronal</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-item" data-step="4">
+                        <span class="step-num">4</span>
+                        <span class="step-title">Pilotage Reynolds</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-item" data-step="5">
+                        <span class="step-num">5</span>
+                        <span class="step-title">Évaluation Fitness</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-item" data-step="6">
+                        <span class="step-num">6</span>
+                        <span class="step-title">Neuro-Évolution</span>
+                    </div>
+                </div>
+
+                <!-- Contenu interactif de l'étape sélectionnée -->
+                <div id="pipelineStepContent" class="pipeline-card-display">
+                    <!-- Rempli par JavaScript -->
+                </div>
+            </div>
+
+            <footer class="modal-footer">
+                <button id="btnPrevStep" class="btn btn-secondary">◀ ÉTAPE PRÉCÉDENTE</button>
+                <div class="step-dots-indicator" id="stepDots"></div>
+                <button id="btnNextStep" class="btn btn-primary">ÉTAPE SUIVANTE ▶</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Télémétrie invisible pour compatibilité des scripts de test -->
+    <div style="display: none;">
+        <span id="statAvgFitBackup"></span>
+        <button id="btnToggleNN"></button>
+        <button id="btnToggleGraph"></button>
+    </div>
 </body>
 
 </html>

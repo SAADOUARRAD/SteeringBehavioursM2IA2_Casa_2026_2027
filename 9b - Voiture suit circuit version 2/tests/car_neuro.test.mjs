@@ -98,6 +98,13 @@ function createTestingContext() {
         map: (v, a, b, c, d) => c + ((v - a) / (b - a)) * (d - c),
         random: (a, b) => b === undefined ? (a === undefined ? Math.random() : Math.random() * a) : a + Math.random() * (b - a),
         color: (...args) => args,
+        red: (c) => Array.isArray(c) ? (c[0] !== undefined ? c[0] : 0) : 0,
+        green: (c) => Array.isArray(c) ? (c[1] !== undefined ? c[1] : 0) : 0,
+        blue: (c) => Array.isArray(c) ? (c[2] !== undefined ? c[2] : 0) : 0,
+        rectMode: () => {},
+        translate: () => {},
+        rotate: () => {},
+        triangle: () => {},
         lerp: (a, b, t) => a + (b - a) * t,
         floor: Math.floor,
         abs: Math.abs,
@@ -141,13 +148,13 @@ function createTestingContext() {
     const context = vm.createContext(sandbox);
 
     // Chargement ordonné des scripts
-    const files = ['globals.js', 'utils.js', 'championPreset.js', 'NeuralNetwork.js', 'Ray.js', 'Track.js', 'Car.js', 'Genetic.js'];
+    const files = ['globals.js', 'utils.js', 'championPreset.js', 'NeuralNetwork.js', 'Ray.js', 'Track.js', 'Car.js', 'Genetic.js', 'BrainVisualizer.js'];
     for (const f of files) {
         const code = readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8');
         vm.runInContext(code, context);
     }
 
-    const exported = vm.runInContext('({ networkConfig, NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining, DEFAULT_CHAMPION_PRESET, drawTrackSurface, setupTrack })', context);
+    const exported = vm.runInContext('({ networkConfig, NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining, DEFAULT_CHAMPION_PRESET, drawTrackSurface, setupTrack, BrainVisualizer })', context);
     return Object.assign(context, exported);
 }
 
@@ -514,5 +521,57 @@ describe('9b Neuroévolution Racing — Tests Unitaires & Benchmarks Cahier des 
         const out = car.brain.predict([0.5, 0.5, 0.5, 0.5, 0.5]);
         assert.ok(!Number.isNaN(out[0]));
         assert.ok(!Number.isNaN(out[1]));
+    });
+
+    it('BrainVisualizer : instanciation et mise à jour sécurisée des actuateurs', () => {
+        const { BrainVisualizer, Car, NeuralNetwork } = ctx;
+        const bv = new BrainVisualizer('dummyCanvas');
+        assert.ok(bv);
+
+        const car = new Car(new NeuralNetwork([5, 10, 6, 2]), 5);
+        car.look(ctx.walls);
+        car.think(ctx.walls);
+
+        assert.doesNotThrow(() => bv.render(car));
+        assert.doesNotThrow(() => bv.updateActuatorGauges(car));
+    });
+
+    it('LiDAR Pro : Car.show supporte les labels métriques et multi-niveaux sans exception', () => {
+        const { Car, NeuralNetwork } = ctx;
+        const car = new Car(new NeuralNetwork([5, 10, 6, 2]), 5);
+        ctx.setupTrack(true);
+        car.look(ctx.walls);
+
+        ctx.SHOW_RAY_LABELS = true;
+        assert.doesNotThrow(() => car.show(true, false));
+        assert.doesNotThrow(() => car.show(false, false));
+
+        ctx.SHOW_RAY_LABELS = false;
+        assert.doesNotThrow(() => car.show(true, false));
+    });
+
+    it('Thèmes Circuit : drawTrackSurface fonctionne sur Neo Tokyo, Mars Ring et Cyber City', () => {
+        const { setupTrack, drawTrackSurface } = ctx;
+        setupTrack(true);
+
+        const themes = ['tokyo', 'mars', 'cyber'];
+        for (let theme of themes) {
+            ctx.TRACK_THEME = theme;
+            assert.doesNotThrow(() => drawTrackSurface(), `Échec sur le thème ${theme}`);
+        }
+    });
+
+    it('Modes et Caméras : bascule sans régression sur Overview, Follow et Chase', () => {
+        const modes = ['overview', 'follow', 'chase'];
+        for (let m of modes) {
+            ctx.CAMERA_MODE = m;
+            assert.equal(ctx.CAMERA_MODE, m);
+        }
+
+        const gameModes = ['training', 'championship'];
+        for (let gm of gameModes) {
+            ctx.GAME_MODE = gm;
+            assert.equal(ctx.GAME_MODE, gm);
+        }
     });
 });

@@ -52,6 +52,17 @@ var SHOW_LIDAR_RADAR = true;    // Affichage des jauges de capteurs LiDAR (touch
 var SHOW_MINIMAP = true;        // Affichage de la minimap radar (touche 'm')
 var FOCUS_BEST_CAR = false;     // Suivi caméra centré sur le leader (touche 'f')
 
+// Nouveaux modes Cyberpunk AI Lab
+var CAMERA_MODE = 'overview';   // 'overview' (global), 'follow' (leader), 'chase' (vue arrière)
+var GAME_MODE = 'training';     // 'training' (apprentissage), 'championship' (course)
+var TRACK_THEME = 'tokyo';      // 'tokyo', 'mars', 'cyber'
+var SHOW_RAY_LABELS = true;     // Affiche les tags métriques "RAY 01: 0.82"
+var CONFIG_PANEL_OPEN = true;   // État du dock gauche
+var BRAIN_PANEL_OPEN = true;    // État du dock droite
+var BOTTOM_DOCK_OPEN = true;    // État du dock bas
+var brainVisualizer = null;     // Instance du visualiseur de cerveau
+
+
 /**
  * ============================================================================
  * CONFIGURATION CENTRALE DU RÉSEAU DE NEURONES (Section 16 du cours)

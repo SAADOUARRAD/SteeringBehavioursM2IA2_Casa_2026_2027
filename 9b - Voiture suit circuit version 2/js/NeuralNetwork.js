@@ -116,6 +116,7 @@ class NeuralNetwork {
             this.lastActivations.push([...current]);
         }
 
+        this.lastOutputs = [...current];
         return current;
     }
 

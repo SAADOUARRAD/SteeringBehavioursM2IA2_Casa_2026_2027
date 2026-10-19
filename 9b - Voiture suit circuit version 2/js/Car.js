@@ -339,35 +339,66 @@ class Car {
         if (typeof push !== 'function') return;
         if (this.dead && !isBest && !isDebug) return;
 
-        // 1. Dessin des rayons lasers avec dégradés luminescents
+        // 1. Dessin des rayons lasers avec dégradés luminescents & étiquettes de métrique
         if (!this.dead || isBest) {
-            for (let r of this.rays) {
-                if (r.end) {
-                    let hit = r.hitFraction; // 0 = proche, 1 = loin
+            let showLabels = (typeof SHOW_RAY_LABELS !== 'undefined' && SHOW_RAY_LABELS) || isDebug;
+            for (let rIdx = 0; rIdx < this.rays.length; rIdx++) {
+                let r = this.rays[rIdx];
+                if (r && r.end) {
+                    let hit = r.hitFraction; // 0 = proche / collision, 1 = dégagé
                     if (isBest) {
-                        // Couleurs dynamiques selon proximité du danger
+                        let strokeCol;
                         if (hit < 0.3) {
-                            stroke(255, 40, 80, 220); // Rouge critique
-                            strokeWeight(1.8);
+                            strokeCol = color(255, 50, 70); // Rouge critique
                         } else if (hit < 0.65) {
-                            stroke(255, 200, 30, 180); // Ambre avertissement
-                            strokeWeight(1.2);
+                            strokeCol = color(245, 158, 11); // Ambre avertissement
                         } else {
-                            stroke(0, 255, 180, 140); // Vert / Cyan voie dégagée
-                            strokeWeight(0.9);
+                            strokeCol = color(16, 185, 129); // Vert / Cyan voie dégagée
+                        }
+
+                        // Lueur diffuse externe du faisceau laser
+                        stroke(red(strokeCol), green(strokeCol), blue(strokeCol), 45);
+                        strokeWeight(4.5);
+                        line(this.pos.x, this.pos.y, r.end.x, r.end.y);
+
+                        // Cœur concentré du laser
+                        stroke(red(strokeCol), green(strokeCol), blue(strokeCol), 230);
+                        strokeWeight(1.4);
+                        line(this.pos.x, this.pos.y, r.end.x, r.end.y);
+
+                        // Réticule d'impact pulsant au contact de l'obstacle
+                        noStroke();
+                        fill(strokeCol);
+                        circle(r.end.x, r.end.y, hit < 0.3 ? 5.5 : 3.8);
+
+                        // Étiquette numérique flottante (ex: "R01: 0.82")
+                        if (showLabels) {
+                            let midX = (this.pos.x + r.end.x * 2) / 3;
+                            let midY = (this.pos.y + r.end.y * 2) / 3;
+                            let tagText = `R${rIdx + 1} ${(hit).toFixed(2)}`;
+
+                            push();
+                            rectMode(CENTER);
+                            noStroke();
+                            fill(10, 15, 25, 210);
+                            rect(midX, midY, 44, 13, 3);
+
+                            stroke(strokeCol);
+                            strokeWeight(0.8);
+                            noFill();
+                            rect(midX, midY, 44, 13, 3);
+
+                            noStroke();
+                            fill(248, 250, 252);
+                            textSize(7.5);
+                            textAlign(CENTER, CENTER);
+                            text(tagText, midX, midY + 0.5);
+                            pop();
                         }
                     } else {
-                        stroke(255, 255, 255, isDebug ? 60 : 25);
-                        strokeWeight(0.6);
-                    }
-
-                    line(this.pos.x, this.pos.y, r.end.x, r.end.y);
-
-                    // Étincelle à l'impact pour le leader
-                    if (isBest) {
-                        noStroke();
-                        fill(hit < 0.3 ? color(255, 50, 50, 240) : color(255, 230, 80, 200));
-                        circle(r.end.x, r.end.y, hit < 0.3 ? 5 : 3.5);
+                        stroke(255, 255, 255, isDebug ? 55 : 20);
+                        strokeWeight(0.5);
+                        line(this.pos.x, this.pos.y, r.end.x, r.end.y);
                     }
                 }
             }

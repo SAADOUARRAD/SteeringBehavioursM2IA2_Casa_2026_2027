@@ -691,6 +691,8 @@ function updateTelemetryUI() {
     const elAlive = document.getElementById('statAlive');
     const elBestFit = document.getElementById('statBestFit');
     const elAvgFit = document.getElementById('statAvgFit');
+    const elDiversity = document.getElementById('statDiversity');
+    const elBestLap = document.getElementById('statBestLap');
 
     let aliveCount = cars.filter(c => !c.dead).length;
     let currentBest = 0;
@@ -708,10 +710,36 @@ function updateTelemetryUI() {
         bestFitnessRecord = currentBest;
     }
 
+    // Calcul de la diversité génétique de la population (% d'écart moyen sur les poids)
+    let diversityPct = 100;
+    let activeCars = cars.length > 0 ? cars : savedCars;
+    if (activeCars.length > 1 && activeCars[0].brain && activeCars[0].brain.weights && activeCars[0].brain.weights[0]) {
+        let sampleSize = Math.min(8, activeCars.length);
+        let diffSum = 0;
+        let comparisons = 0;
+        let w0 = activeCars[0].brain.weights[0];
+
+        for (let k = 1; k < sampleSize; k++) {
+            let wk = activeCars[k].brain?.weights ? activeCars[k].brain.weights[0] : null;
+            if (wk && w0) {
+                for (let r = 0; r < Math.min(w0.length, wk.length); r++) {
+                    for (let c = 0; c < Math.min(w0[r].length, wk[r].length); c++) {
+                        diffSum += Math.abs(w0[r][c] - wk[r][c]);
+                        comparisons++;
+                    }
+                }
+            }
+        }
+        let avgDiff = comparisons > 0 ? diffSum / comparisons : 0;
+        diversityPct = Math.round(constrain(avgDiff * 120, 15, 100));
+    }
+
     if (elGen) elGen.innerText = generation;
     if (elAlive) elAlive.innerText = `${aliveCount} / ${TOTAL_POP}`;
     if (elBestFit) elBestFit.innerText = Math.round(bestFitnessRecord);
     if (elAvgFit) elAvgFit.innerText = Math.round(currentAvg);
+    if (elDiversity) elDiversity.innerText = `${diversityPct}%`;
+    if (elBestLap) elBestLap.innerText = bestLapTimeRecord ? `${bestLapTimeRecord.toFixed(2)}s` : '--';
 }
 
 /**

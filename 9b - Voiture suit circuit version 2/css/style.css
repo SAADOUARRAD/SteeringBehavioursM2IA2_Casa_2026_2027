@@ -503,6 +503,48 @@ input[type="range"]::-webkit-slider-thumb:hover {
     color: var(--text-primary);
 }
 
+/* Accordéon Raccourcis Clavier */
+.shortcuts-accordion {
+    margin-top: 8px;
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.shortcuts-accordion summary {
+    padding: 6px 8px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+}
+
+.shortcuts-accordion summary:hover {
+    color: #7dd3fc;
+}
+
+.shortcuts-list {
+    padding: 6px 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.68rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.shortcuts-list kbd {
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: var(--font-mono);
+    color: var(--accent-amber);
+    font-weight: bold;
+}
+
 /* Pied du Panneau */
 .panel-footer {
     display: flex;

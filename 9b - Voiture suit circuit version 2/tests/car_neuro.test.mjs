@@ -136,25 +136,54 @@ function createTestingContext() {
         ROUND: 'round',
         CLOSE: 'close',
         CENTER: 'center',
+        LEFT: 'left',
+        RIGHT: 'right',
+        TOP: 'top',
+        BOTTOM: 'bottom',
+        BOLD: 'bold',
+        NORMAL: 'normal',
+        ITALIC: 'italic',
+        textStyle: () => {},
         window: { startAngle: 0, startCheckpointIndex: 0 },
         document: {
             getElementById: () => null,
             activeElement: { matches: () => false }
         },
-        console
+        console,
+        // Stub pour les API Canvas 2D (drawingContext) utilisées par WorldRenderer
+        drawingContext: {
+            createLinearGradient: () => ({ addColorStop: () => {} }),
+            createRadialGradient: () => ({ addColorStop: () => {} }),
+            fillRect: () => {},
+            beginPath: () => {},
+            moveTo: () => {},
+            lineTo: () => {},
+            closePath: () => {},
+            fill: () => {},
+            stroke: () => {},
+            arc: () => {},
+            save: () => {},
+            restore: () => {},
+            fillStyle: '',
+            strokeStyle: '',
+            globalAlpha: 1,
+            shadowBlur: 0,
+            shadowColor: '',
+            filter: ''
+        }
     };
     sandbox.globalThis = sandbox;
 
     const context = vm.createContext(sandbox);
 
     // Chargement ordonné des scripts
-    const files = ['globals.js', 'utils.js', 'championPreset.js', 'NeuralNetwork.js', 'Ray.js', 'Track.js', 'Car.js', 'Genetic.js', 'BrainVisualizer.js'];
+    const files = ['globals.js', 'utils.js', 'championPreset.js', 'NeuralNetwork.js', 'Ray.js', 'Track.js', 'Car.js', 'Genetic.js', 'BrainVisualizer.js', 'WorldRenderer.js'];
     for (const f of files) {
         const code = readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8');
         vm.runInContext(code, context);
     }
 
-    const exported = vm.runInContext('({ networkConfig, NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining, DEFAULT_CHAMPION_PRESET, drawTrackSurface, setupTrack, BrainVisualizer })', context);
+    const exported = vm.runInContext('({ networkConfig, NeuralNetwork, Ray, Car, distPointToSegment, getTopology, updateRayCount, nextGeneration, calculateFitness, tournamentSelection, resetTraining, DEFAULT_CHAMPION_PRESET, drawTrackSurface, setupTrack, BrainVisualizer, WorldRenderer })', context);
     return Object.assign(context, exported);
 }
 
@@ -573,5 +602,35 @@ describe('9b Neuroévolution Racing — Tests Unitaires & Benchmarks Cahier des 
             ctx.GAME_MODE = gm;
             assert.equal(ctx.GAME_MODE, gm);
         }
+    });
+
+    it('WorldRenderer : init et draw sans exception sur les 4 thèmes futuristes', () => {
+        const { WorldRenderer, setupTrack } = ctx;
+        assert.ok(WorldRenderer, 'WorldRenderer doit être défini dans le contexte');
+        setupTrack(true);
+
+        const themes = ['tokyo', 'mars', 'lunar', 'volcanic'];
+        for (const theme of themes) {
+            assert.doesNotThrow(
+                () => WorldRenderer.init(1200, 800, theme),
+                `WorldRenderer.init doit fonctionner pour le thème "${theme}"`
+            );
+            assert.doesNotThrow(
+                () => WorldRenderer.drawBackground(1200, 800, 500, 400, 3.5),
+                `WorldRenderer.drawBackground doit fonctionner pour le thème "${theme}"`
+            );
+            assert.doesNotThrow(
+                () => WorldRenderer.drawForeground(1200, 800, 500, 400, 3.5),
+                `WorldRenderer.drawForeground doit fonctionner pour le thème "${theme}"`
+            );
+            assert.doesNotThrow(
+                () => WorldRenderer.onCheckpointHit(0),
+                `WorldRenderer.onCheckpointHit doit fonctionner pour le thème "${theme}"`
+            );
+        }
+
+        // setTheme doit être idempotent
+        assert.doesNotThrow(() => WorldRenderer.setTheme('tokyo', 1200, 800));
+        assert.doesNotThrow(() => WorldRenderer.setTheme('unknown_theme', 1200, 800));
     });
 });

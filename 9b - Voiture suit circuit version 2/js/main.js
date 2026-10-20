@@ -19,12 +19,21 @@ function setup() {
 
     setupTrack(true);
     resetTraining(true);
+
+    // Initialisation du moteur d'environnement futuriste
+    if (typeof WorldRenderer !== 'undefined') {
+        WorldRenderer.init(windowWidth, windowHeight, TRACK_THEME);
+    }
+
     initDynamicUI();
 }
 
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
     setupTrack(false);
+    if (typeof WorldRenderer !== 'undefined') {
+        WorldRenderer.init(windowWidth, windowHeight, TRACK_THEME);
+    }
 }
 
 function draw() {
@@ -53,7 +62,15 @@ function draw() {
         translate(targetX, targetY);
     }
 
-    // 0. Surface de piste asphaltée réaliste F1 & vibreurs
+    // 0a. Environnement futuriste (ville, bâtiments, pluie de fond, ponts, néons)
+    if (typeof WorldRenderer !== 'undefined') {
+        let leadX = bestCar ? bestCar.pos.x : null;
+        let leadY = bestCar ? bestCar.pos.y : null;
+        let leadSpeed = bestCar ? (typeof bestCar.vel.mag === 'function' ? bestCar.vel.mag() : Math.hypot(bestCar.vel.x, bestCar.vel.y)) : 0;
+        WorldRenderer.drawBackground(width, height, leadX, leadY, leadSpeed);
+    }
+
+    // 0b. Surface de piste asphaltée réaliste F1 & vibreurs
     if (typeof drawTrackSurface === 'function') {
         drawTrackSurface();
     }
@@ -101,6 +118,14 @@ function draw() {
     }
 
     pop(); // Fin de la transformation caméra
+
+    // 3b. Effets de premier plan (pluie, vignette, brouillard cinématique) — hors transformation caméra
+    if (typeof WorldRenderer !== 'undefined') {
+        let leadX = bestCar ? bestCar.pos.x : null;
+        let leadY = bestCar ? bestCar.pos.y : null;
+        let leadSpeed = bestCar ? (typeof bestCar.vel.mag === 'function' ? bestCar.vel.mag() : Math.hypot(bestCar.vel.x, bestCar.vel.y)) : 0;
+        WorldRenderer.drawForeground(width, height, leadX, leadY, leadSpeed);
+    }
 
     // 4. Visualiseur Schématique du Réseau de Neurones (Section 13 du cours)
     if (SHOW_NN_VISUALIZER) {
@@ -156,6 +181,12 @@ function updateSimulationStep() {
         car.update();
         car.checkCheckpoints(checkpoints);
         checkCollisions(car);
+
+        // Hook checkpoint pour les effets lumineux WorldRenderer
+        if (typeof WorldRenderer !== 'undefined' && car.score > (car._prevScoreWR || 0)) {
+            WorldRenderer.onCheckpointHit(car.checkpointIndex);
+            car._prevScoreWR = car.score;
+        }
 
         if (car.dead) {
             savedCars.push(cars.splice(i, 1)[0]);
@@ -979,6 +1010,9 @@ function initDynamicUI() {
         TRACK_THEME = e.target.value;
         if (typeof document !== 'undefined' && document.body) {
             document.body.className = `theme-${TRACK_THEME}`;
+        }
+        if (typeof WorldRenderer !== 'undefined') {
+            WorldRenderer.setTheme(TRACK_THEME, width, height);
         }
     });
 

@@ -1,0 +1,6 @@
+node_modules/
+*.mp4
+*.wav
+record_*.mjs
+fast_record.mjs
+package*.json
